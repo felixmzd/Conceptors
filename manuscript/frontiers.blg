@@ -1,0 +1,47 @@
+This is BibTeX, Version 0.99d (TeX Live 2015/Debian)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: frontiers.aux
+The style file: frontiersinSCNS_ENG_HUMS.bst
+Database file #1: fmeyerzudrie.bib
+Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
+You've used 7 entries,
+            3027 wiz_defined-function locations,
+            658 strings with 5809 characters,
+and the built_in function-call counts, 3473 in all, are:
+= -- 278
+> -- 118
+< -- 6
++ -- 56
+- -- 34
+* -- 226
+:= -- 560
+add.period$ -- 12
+call.type$ -- 7
+change.case$ -- 43
+chr.to.int$ -- 8
+cite$ -- 14
+duplicate$ -- 258
+empty$ -- 285
+format.name$ -- 44
+if$ -- 687
+int.to.chr$ -- 1
+int.to.str$ -- 1
+missing$ -- 58
+newline$ -- 54
+num.names$ -- 28
+pop$ -- 110
+preamble$ -- 1
+purify$ -- 39
+quote$ -- 0
+skip$ -- 110
+stack$ -- 0
+substring$ -- 137
+swap$ -- 107
+text.length$ -- 1
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 57
+warning$ -- 0
+while$ -- 26
+width$ -- 0
+write$ -- 107
