@@ -1,5 +1,5 @@
 from binocular.reservoir_hrfc import *
-from binocular import pattCat
+from binocular import pattern_functions
 from matplotlib.pyplot import *
 
 # from matplotlib2tikz import save as tikz_save
@@ -9,16 +9,16 @@ patterns = []
 
 # for p in [53, 54, 10, 36]:
 for p in [54, 36]:
-    patterns.append(pattCat.patterns[p])
+    patterns.append(pattern_functions.patterns[p])
 
-reservoir = ReservoirHRFC()
+reservoir = ReservoirHierarchicalRandomFeatureConceptor()
 reservoir.run(patterns)
 reservoir.recall()
 reservoir.denoise()
 
 ### PLOTTING ###
 
-allDriverPL, allRecallPL, NRMSE = functions.plot_interpolate_1d(patterns, reservoir.Y_recalls)
+allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls)
 for i in range(len(patterns)):
     subplot(len(patterns), 1, (i + 1))
     # driver and recall

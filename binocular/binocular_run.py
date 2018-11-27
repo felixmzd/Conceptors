@@ -1,5 +1,5 @@
 from binocular.reservoir_binocular import *
-from binocular import pattCat
+from binocular import pattern_functions
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import pickle
@@ -11,7 +11,7 @@ patterns = []
 # for p in [50,  20]:
 # for p in [50,  27]:
 for p in [50, 53]:
-    patterns.append(pattCat.patterns[p])
+    patterns.append(pattern_functions.patterns[p])
 
 np.random.seed(3)
 reservoir = ReservoirBinocular.init_random()
@@ -20,7 +20,7 @@ reservoir.recall()
 reservoir.binocular(t_run=5000)
 
 ### PLOTTING ###
-allDriverPL, allRecallPL, NRMSE = functions.plot_interpolate_1d(patterns, reservoir.Y_recalls, plotrange=100)
+allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls, plotrange=100)
 loading = [allDriverPL, allRecallPL, NRMSE]
 
 for i in range(len(patterns)):

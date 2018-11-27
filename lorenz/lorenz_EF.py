@@ -1,8 +1,11 @@
+"""This script is rather unrelated to the project and can be seen as the hello world of reservoir computing.
+
+It shows how a reservoir network can be used to learned a Lorenz attractor."""
 import numpy as np
 import matplotlib.pyplot as plt
 
-from binocular import functions
-from binocular.reservoir_lorenz import Reservoir
+from lorenz import functions
+from lorenz.reservoir_lorenz import Reservoir
 
 patterns = []
 

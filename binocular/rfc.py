@@ -3,21 +3,21 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from binocular.reservoir_rfc import ReservoirRFC
-from binocular import pattCat
-from binocular import functions
+from binocular.reservoir_rfc import ReservoirRandomFeatureConceptor
+from binocular import pattern_functions
+from binocular import utils
 
 np.random.seed(0)
 
 patterns = []
 for p in [53, 54, 10, 36]:
-    patterns.append(pattCat.patterns[p])
+    patterns.append(pattern_functions.patterns[p])
 
-reservoir = ReservoirRFC()
+reservoir = ReservoirRandomFeatureConceptor()
 reservoir.run(patterns)
 reservoir.recall()
 
-allDriverPL, allRecallPL, NRMSE = functions.plot_interpolate_1d(patterns, reservoir.Y_recalls)
+allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls)
 
 results = [allDriverPL, allRecallPL, reservoir.C, reservoir.cColls]
 

@@ -1,10 +1,10 @@
-from binocular import functions
+from binocular import utils
 import scipy.sparse.linalg as lin
 import math
 import numpy as np
 
 
-class ReservoirRFC:
+class ReservoirRandomFeatureConceptor:
 
     def __init__(self, N=100, M=500, alpha=8, NetSR=1.4, bias_scale=0.2, inp_scale=1.2):
 
@@ -117,8 +117,8 @@ class ReservoirRFC:
         if load:
             """Output Training."""
 
-            self.W_out = functions.RidgeWout(self.TrainArgs, TrainOuts, self.TyA_wout)
-            self.NRMSE_readout = functions.NRMSE(np.dot(self.W_out, self.TrainArgs), TrainOuts);
+            self.W_out = utils.RidgeWout(self.TrainArgs, TrainOuts, self.TyA_wout)
+            self.NRMSE_readout = utils.NRMSE(np.dot(self.W_out, self.TrainArgs), TrainOuts);
             txt = 'NRMSE for output training = {0}'.format(self.NRMSE_readout)
             print(txt)
 
@@ -126,8 +126,8 @@ class ReservoirRFC:
 
             G_args = self.TrainOldArgs
             G_targs = self.allT
-            self.G = functions.RidgeWload(G_args, G_targs, self.TyA_wload)
-            self.NRMSE_load = functions.NRMSE(np.dot(self.G, self.TrainOldArgs), G_targs)
+            self.G = utils.RidgeWload(G_args, G_targs, self.TyA_wload)
+            self.NRMSE_load = utils.NRMSE(np.dot(self.G, self.TrainOldArgs), G_targs)
             txt = 'Mean NRMSE per neuron for recomputing G = {0}'.format(np.mean(self.NRMSE_load))
             print(txt)
 

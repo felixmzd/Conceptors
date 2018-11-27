@@ -1,4 +1,4 @@
-from binocular import functions
+from lorenz import functions
 import numpy as np
 
 

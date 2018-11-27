@@ -2,7 +2,7 @@ import math
 import numpy as np
 import scipy.sparse.linalg as lin
 
-from binocular import functions
+from binocular import utils
 
 
 def _generate_connection_matrices(N, M, NetSR, bias_scale):
@@ -57,7 +57,7 @@ class ReservoirBinocular:
         return cls(F, G_star, W_bias, alpha, inp_scale)
 
     def run(self, patterns, t_learn=600, t_learnc=2000, t_wash=200, TyA_wout=1, TyA_wload=0.01, c_adapt_rate=0.5):
-
+        """Feed input, learn output weights, adapt weights."""
         self.patterns = patterns
         self.t_learn = t_learn
         self.t_learnc = t_learnc
@@ -74,7 +74,7 @@ class ReservoirBinocular:
         # r: state of the neurons in the reservoir pool
         # phi: result of mapping from reservoir to feature neurons by F
         # c: conception weights
-        # c_phi: activations in fature space, resulting from applying conceptor
+        # c_phi: activations in feature space, resulting from applying conceptor
         #        weights c to phi.
         # z: result of mapping feature space activations to reservoir space by G
         #
@@ -106,7 +106,7 @@ class ReservoirBinocular:
 
         # drive reservoir with random input
         rando = {}
-        for i, p in zip(range(self.n_patts), self.patterns):
+        for i, p in enumerate(self.patterns):
             rando['r'] = np.zeros([self.N, self.t_learn])
             rando['p'] = np.zeros([1, self.t_learn])
             rando['z'] = np.zeros([self.N, self.t_learn])
@@ -134,10 +134,10 @@ class ReservoirBinocular:
             self.all_rand['old_cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['old_cphi']
 
         # recompute G
-        args = self.all_rand['old_cphi']
-        targs = self.all_rand['z']
-        self.G = functions.RidgeWload(args, targs, 0.1)
-        nrmse_g = np.mean(functions.NRMSE(self.G @ args, targs))
+        features = self.all_rand['old_cphi']
+        targets = self.all_rand['z']
+        self.G = utils.RidgeWload(features, targets, 0.1)
+        nrmse_g = np.mean(utils.NRMSE(self.G @ features, targets))
         txt = 'NRMSE for recomputing G = {0}'.format(nrmse_g)
         print(txt)
 
@@ -184,7 +184,7 @@ class ReservoirBinocular:
                 phi = self.F @ r
                 cphi = c * phi
 
-                if (t <= self.t_learnc + self.t_wash and t > self.t_wash):
+                if self.t_wash < t <= self.t_learnc + self.t_wash:
                     c = c + self.c_adapt_rate * ((cphi - c * cphi) * cphi - math.pow(self.alpha, -2) * c)
                     train['c'][:, (t - self.t_wash) - 1] = c
 
@@ -211,9 +211,10 @@ class ReservoirBinocular:
             signal_energy = np.power(train['old_cphi'], 2)
             self.raw_Z[:, i] = np.mean(signal_energy, axis=1)
 
-        # compute feature space energys for every pattern
+        # compute feature space energies for every pattern
         # they are used to indirectly compose a weighted disjunction of the prototype conception weight vectors
-        # together with the aperture the mean signal energies define a concepion weight vector
+        # together with the aperture the mean signal energies define a conception weight vector
+        # Feature space energy is a meaure for how well the conceptor fits the activations.
         # normalize
         norms_Z = np.sqrt(np.sum(np.power(self.raw_Z, 2), axis=0))
         mean_norms_Z = np.mean(norms_Z)
@@ -222,27 +223,31 @@ class ReservoirBinocular:
         # prototype mean signal energy vector matrix
         self.Z = (self.raw_Z @ np.diag(1. / norms_Z)) * mean_norms_Z
 
-        """ Output Training """
-        args = self.all_train['r']
-        targs = self.all_train['p']
-        self.W_out = functions.RidgeWout(args, targs, self.TyA_wout)
-        self.NRMSE_readout = functions.NRMSE(np.dot(self.W_out, args), targs);
+        # Output Training with linear regression.
+        features = self.all_train['r']
+        targets = self.all_train['p']
+        self.W_out = utils.RidgeWout(features, targets, self.TyA_wout)
+        self.NRMSE_readout = utils.NRMSE(np.dot(self.W_out, features), targets)
         txt = 'NRMSE for output training = {0}'.format(self.NRMSE_readout)
         print(txt)
 
-        """ Loading """
-
-        targs = self.all_train['p']
-        args = self.all_train['old_cphi']
-        self.D = functions.RidgeWload(args, targs, self.TyA_wload)
-        self.NRMSE_load = functions.NRMSE(np.dot(self.D, args), targs)
+        # Loading
+        # Adapt weights to be able to generate output while driving with random input.
+        features = self.all_train['old_cphi']
+        targets = self.all_train['p']
+        self.D = utils.RidgeWload(features, targets, self.TyA_wload)
+        self.NRMSE_load = utils.NRMSE(np.dot(self.D, features), targets)
         txt = 'Mean NRMSE per neuron for recomputing D = {0}'.format(np.mean(self.NRMSE_load))
         print(txt)
 
-    def recall(self, t_ctest_wash=200, t_recall=200):
+    def recall(self, t_washout=200, t_recall=200):
+        """Get conceptor for each pattern and regenerate pattern according to conceptor.
 
+        Args:
+            t_recall: Number of timesteps to recall.
+        """
         self.Y_recalls = []
-        self.t_ctest_wash = t_ctest_wash
+        self.t_ctest_wash = t_washout
         self.t_recall = t_recall
 
         for i in range(self.n_patts):
@@ -372,7 +377,7 @@ class ReservoirBinocular:
 
         for t in range(t_run):
             # only the part of the stimulus is fed into the system that can not be explained by the current hypothesis
-            if (hypo3[0][0] > hypo3[0][1]):
+            if hypo3[0][0] > hypo3[0][1]:
                 u = 1.0 * self.patterns[1](t)
             else:
                 u = 1.0 * self.patterns[0](t)

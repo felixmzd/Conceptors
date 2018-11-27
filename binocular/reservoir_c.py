@@ -1,8 +1,8 @@
-from binocular import functions
+from binocular import utils
 import numpy as np
 
 
-class Reservoir:
+class ReservoirConceptor:
 
     def __init__(self, N=100, alpha=10, NetSR=1.5, bias_scale=0.2, inp_scale=1.5, conn=None):
 
@@ -16,7 +16,7 @@ class Reservoir:
         else:
             self.conn = conn
 
-        self.W_raw = self.NetSR * functions.IntWeights(self.N, self.N, self.conn)
+        self.W_raw = self.NetSR * utils.IntWeights(self.N, self.N, self.conn)
         self.W_bias = self.bias_scale * np.random.randn(self.N)
 
     def run(self, patterns, t_learn=1000, t_wash=100, TyA_wout=0.01, TyA_wload=0.0001,
@@ -101,16 +101,16 @@ class Reservoir:
         if load:
             """Output Training"""
 
-            self.W_out = functions.RidgeWout(self.TrainArgs, TrainOuts, self.TyA_wout)
-            self.NRMSE_readout = functions.NRMSE(np.dot(self.W_out, self.TrainArgs), TrainOuts);
+            self.W_out = utils.RidgeWout(self.TrainArgs, TrainOuts, self.TyA_wout)
+            self.NRMSE_readout = utils.NRMSE(np.dot(self.W_out, self.TrainArgs), TrainOuts);
             print(self.NRMSE_readout)
 
             """ Loading """
 
             W_bias_rep = np.tile(self.W_bias, (self.n_patts * self.t_learn, 1)).T
             W_targets = (np.arctanh(self.TrainArgs) - W_bias_rep)
-            self.W = functions.RidgeWload(self.TrainOldArgs, W_targets, self.TyA_wload)
-            self.NRMSE_load = functions.NRMSE(np.dot(self.W, self.TrainOldArgs), W_targets)
+            self.W = utils.RidgeWload(self.TrainOldArgs, W_targets, self.TyA_wload)
+            self.NRMSE_load = utils.NRMSE(np.dot(self.W, self.TrainOldArgs), W_targets)
             print(np.mean(self.NRMSE_load))
 
     def recall(self, t_recall=200):

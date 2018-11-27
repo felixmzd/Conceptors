@@ -1,10 +1,10 @@
-from binocular import functions
+from binocular import utils
 import numpy as np
 import scipy.sparse.linalg as lin
 import math
 
 
-class ReservoirHRFC:
+class ReservoirHierarchicalRandomFeatureConceptor:
 
     def __init__(self, N=100, M=700, alpha=10, NetSR=1.4, bias_scale=0.2, inp_scale=1.2):
         np.random.seed(42)
@@ -116,8 +116,8 @@ class ReservoirHRFC:
         # recompute G
         args = self.all_rand['old_cphi']
         targs = self.all_rand['z']
-        self.G = functions.RidgeWload(args, targs, 0.1)
-        nrmse_g = np.mean(functions.NRMSE(self.G @ args, targs))
+        self.G = utils.RidgeWload(args, targs, 0.1)
+        nrmse_g = np.mean(utils.NRMSE(self.G @ args, targs))
         txt = 'NRMSE for recomputing G = {0}'.format(nrmse_g)
         print(txt)
 
@@ -205,8 +205,8 @@ class ReservoirHRFC:
         """ Output Training """
         args = self.all_train['r']
         targs = self.all_train['p']
-        self.W_out = functions.RidgeWout(args, targs, self.TyA_wout)
-        self.NRMSE_readout = functions.NRMSE(np.dot(self.W_out, args), targs);
+        self.W_out = utils.RidgeWout(args, targs, self.TyA_wout)
+        self.NRMSE_readout = utils.NRMSE(np.dot(self.W_out, args), targs);
         txt = 'NRMSE for output training = {0}'.format(self.NRMSE_readout)
         print(txt)
 
@@ -214,8 +214,8 @@ class ReservoirHRFC:
 
         targs = self.all_train['p']
         args = self.all_train['old_cphi']
-        self.D = functions.RidgeWload(args, targs, self.TyA_wload)
-        self.NRMSE_load = functions.NRMSE(np.dot(self.D, args), targs)
+        self.D = utils.RidgeWload(args, targs, self.TyA_wload)
+        self.NRMSE_load = utils.NRMSE(np.dot(self.D, args), targs)
         txt = 'Mean NRMSE per neuron for recomputing D = {0}'.format(np.mean(self.NRMSE_load))
         print(txt)
 
@@ -236,7 +236,7 @@ class ReservoirHRFC:
             y_recall = np.zeros([self.t_recall, self.n_ip_dim])
 
             for t in range(self.t_recall):
-                r = np.tanh(self.G @ cphi + self.W_in @ self.D @ cphi + self.W_bias);
+                r = np.tanh(self.G @ cphi + self.W_in @ self.D @ cphi + self.W_bias)
                 cphi = c * (self.F @ r)
                 y_recall[t] = self.W_out @ r
 
