@@ -13,15 +13,17 @@ patterns = []
 for p in [53, 54, 10, 36]:
     patterns.append(pattern_functions.patterns[p])
 
-reservoir = ReservoirRandomFeatureConceptor()
+reservoir = ReservoirRandomFeatureConceptor.init_random()
 reservoir.run(patterns)
 reservoir.recall()
 
 allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls)
 
-results = [allDriverPL, allRecallPL, reservoir.C, reservoir.cColls]
+results = [allDriverPL, allRecallPL, reservoir.C, reservoir.c_colls]
 
-with open('FigureObject.fig_rfc.pickle', "wb") as fp:
+
+
+with open('../tests/data/FigureObject.fig_rfc.pickle', "wb") as fp:
     pickle.dump(results, fp, protocol=2)
 
 # plot adaptation of c's
@@ -46,7 +48,7 @@ for i in range(len(patterns)):
     num_plots = 40
     colormap = plt.cm.gray
     plt.gca().set_prop_cycle(plt.cycler('color', [colormap(i) for i in np.linspace(0, 0.9, num_plots)]))
-    plt.plot(reservoir.cColls[i, 1:num_plots, :].T)
+    plt.plot(reservoir.c_colls[i, 1:num_plots, :].T)
     plt.ylim([-0.1, 1.1])
     if (i + 1) * 3 == 3:
         plt.title('c adaptation')
