@@ -14,7 +14,7 @@ for p in [53, 54, 10, 36]:
     patterns.append(pattern_functions.patterns[p])
 
 reservoir = ReservoirRandomFeatureConceptor.init_random()
-reservoir.run(patterns)
+reservoir.fit(patterns)
 reservoir.recall()
 
 allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls)

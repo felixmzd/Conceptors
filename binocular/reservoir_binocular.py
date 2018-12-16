@@ -56,7 +56,7 @@ class ReservoirBinocular:
         F, G_star, W_bias = _generate_connection_matrices(N, M, NetSR, bias_scale)
         return cls(F, G_star, W_bias, alpha, inp_scale)
 
-    def run(self, patterns, t_learn=600, t_learnc=2000, t_wash=200, TyA_wout=1, TyA_wload=0.01, c_adapt_rate=0.5):
+    def fit(self, patterns, t_learn=600, t_learnc=2000, t_wash=200, TyA_wout=1, TyA_wload=0.01, c_adapt_rate=0.5):
         """Feed input, learn output weights, adapt weights."""
         self.patterns = patterns
         self.t_learn = t_learn

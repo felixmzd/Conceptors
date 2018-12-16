@@ -15,10 +15,10 @@ def test_rfc_result(shared_datadir):
         patterns.append(pattern_functions.patterns[p])
 
     reservoir = ReservoirRandomFeatureConceptor.init_random()
-    reservoir.run(patterns)
-    reservoir.recall()
+    reservoir.fit(patterns)
+    Y_recalls = reservoir.recall()
 
-    allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls)
+    allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, Y_recalls)
 
     results = [allDriverPL, allRecallPL, reservoir.C, reservoir.c_colls]
 

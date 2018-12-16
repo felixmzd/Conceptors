@@ -15,7 +15,7 @@ for p in [50, 53]:
 
 np.random.seed(3)
 reservoir = ReservoirBinocular.init_random()
-reservoir.run(patterns)
+reservoir.fit(patterns)
 reservoir.recall()
 reservoir.binocular(t_run=5000)
 
