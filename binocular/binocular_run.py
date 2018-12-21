@@ -3,6 +3,7 @@ from binocular import pattern_functions
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import pickle
+from matplotlib.pyplot import *
 
 patterns = []
 
@@ -36,100 +37,94 @@ for i in range(len(patterns)):
 with open('FigureObject.fig_loading.pickle', "wb") as fp:
     pickle.dump(loading, fp)
 
-plt.show()
 
+# save driver input
+savedriver = []
+savedriver.append(reservoir.all['driver_sine1'][:, 0:100].T)
+savedriver.append(reservoir.all['driver_sine2'][:, 0:100].T)
+savedriver.append(reservoir.all['driver_noise'][:, 0:100].T)
+savedriver.append(reservoir.all['driver'][:, 0:100].T)
+with open('FigureObject.fig_rawinput.pickle', "wb") as fp:
+    pickle.dump(savedriver, fp, protocol=2)
 
-## save driver input
-# savedriver = []
-# savedriver.append(A.all['driver_sine1'][:,0:100].T)
-# savedriver.append(A.all['driver_sine2'][:,0:100].T)
-# savedriver.append(A.all['driver_noise'][:,0:100].T)
-# savedriver.append(A.all['driver'][:,0:100].T)
-# with open('FigureObject.fig_rawinput.pickle', "wb") as fp:
-#    pickle.dump(savedriver, fp, protocol=2)
+save_real_input = []
+save_real_input.append(reservoir.all['real_input_w-o_noise'][:, 0:100].T)
+save_real_input.append(reservoir.all['real_input'][:, 0:100].T)
+with open('FigureObject.fig_realinput.pickle', "wb") as fp:
+    pickle.dump(save_real_input, fp, protocol=2)
 
-# save_real_input = []
-# save_real_input.append(A.all['real_input_w-o_noise'][:,0:100].T)
-# save_real_input.append(A.all['real_input'][:,0:100].T)
-# with open('FigureObject.fig_realinput.pickle', "wb") as fp:
-#    pickle.dump(save_real_input, fp, protocol=2)
+res = []
 
-#
-#
-# res = []
-#
-# res.append(A.all['hypo3'])
-# res.append(A.all['hypo2'])
-# res.append(A.all['hypo1'])
-# res.append(A.all['trusts12'])
-# res.append(A.all['trusts23'])
-# with open('FigureObject.fig_result.pickle', "wb") as fp:
-#     pickle.dump(res, fp, protocol=2)
+res.append(reservoir.all['hypo3'])
+res.append(reservoir.all['hypo2'])
+res.append(reservoir.all['hypo1'])
+res.append(reservoir.all['trusts12'])
+res.append(reservoir.all['trusts23'])
+with open('FigureObject.fig_result.pickle', "wb") as fp:
+    pickle.dump(res, fp, protocol=2)
 
+##
 
-###
+with open('FigureObject.fig_predictions.pickle', "wb") as fp:
+    pickle.dump(reservoir.all['y3'], fp, protocol=2)
 
-# with open('FigureObject.fig_predictions.pickle', "wb") as fp:
-#     pickle.dump(A.all['y3'], fp, protocol=2)
+# recall
+figure()
+plot(reservoir.all['y3'][:, 3960:4000].T, color='black')
+plot(reservoir.all['y3'][:, 3960:4000].T - reservoir.all['driver'][:, 3960:4000].T, color='gray', linewidth=4.0)
+plt.title('output and difference ')
 
+# discrepancys on every level
+figure()
+plot(reservoir.all['trusts1'].T, 'b')
+plot(reservoir.all['trusts2'].T, 'g')
+plot(reservoir.all['trusts3'].T, 'y')
+plt.title('trusts')
 
-# # recall
-# plot(A.all['y3'][:,3960:4000].T, color='black')
-# figure()
-# plot(A.all['y3'][:,3960:4000].T-A.all['driver'][:,3960:4000].T, color='gray', linewidth=4.0)
+figure()
+plot(reservoir.all['unexplained1'][:, 3960:4000].T, 'b')
+plot(reservoir.all['unexplained2'][:, 3960:4000].T, 'g')
+plot(reservoir.all['unexplained3'][:, 3960:4000].T, 'y')
 
-# figure()
-# # discrepancys on every level
-# plot(A.all['trusts1'].T, 'b')
-# plot(A.all['trusts2'].T, 'g')
-# plot(A.all['trusts3'].T, 'y')
-
-# figure()
-# #plot(A.all['unexplained1'][:,3960:4000].T, 'b')
-# #plot(A.all['unexplained2'][:,3960:4000].T, 'g')
-# #plot(A.all['unexplained3'][:,3960:4000].T, 'y')
-#
-# plot(A.all['driver'][:,0:500].T, 'g')
-
+# plot(reservoir.all['driver'][:, 0:500].T, 'g')
+plt.title('unexplained')
 
 # compute dominance times per signal / eye
-# hypo = A.all['hypo3']
-#
-# maxidx = np.argmax(hypo, axis=0)
-#
-# crossings = maxidx[0:-1] - maxidx[1:]
-# cross_idx = np.nonzero(crossings)
-# dom_times = cross_idx[0][1:] - cross_idx[0][0:-1]
+hypo = reservoir.all['hypo3']
 
-# dom_times = dom_times / np.mean(dom_times)
+maxidx = np.argmax(hypo, axis=0)
 
+crossings = maxidx[0:-1] - maxidx[1:]
+cross_idx = np.nonzero(crossings)
+dom_times = cross_idx[0][1:] - cross_idx[0][0:-1]
+
+dom_times = dom_times / np.mean(dom_times)
 
 # as the signals are alternating, even indices belong to
 # one, odd indices to the dominance periods of the other signal
-# dom_sg1 = dom_times[::2]
-# dom_sg2 = dom_times[1::2]
+dom_sg1 = dom_times[::2]
+dom_sg2 = dom_times[1::2]
 
 # delete all that are shorter than a specified value (maybe 25 timesteps),
 # they are not perceivalbe and unsignitifcant
-# cutval = 25
-# del_idx_1 = np.nonzero(dom_sg1 <= cutval)[0]
-# del_idx_2 = np.nonzero(dom_sg2 <= cutval)[0]
-# dom_sg1 = np.delete(dom_sg1, del_idx_1)
-# dom_sg2 = np.delete(dom_sg2, del_idx_2)
+cutval = 25
+del_idx_1 = np.nonzero(dom_sg1 <= cutval)[0]
+del_idx_2 = np.nonzero(dom_sg2 <= cutval)[0]
+dom_sg1 = np.delete(dom_sg1, del_idx_1)
+dom_sg2 = np.delete(dom_sg2, del_idx_2)
 
-# dom_times = np.sort(dom_times)
-## dismiss rapid changes as thex might not be conscious
-# dom_times = dom_times[40:]
+dom_times = np.sort(dom_times)
+# dismiss rapid changes as thex might not be conscious
+dom_times = dom_times[40:]
 
-# dom_times = dom_times / np.mean(dom_times)
-
+dom_times = dom_times / np.mean(dom_times)
 
 # normalize
 
-# domtimes = []
-# domtimes.append(dom_sg1)
-# domtimes.append(dom_sg2)
-# with open('FigureObject.fig_domtimes.pickle', "wb") as fp:
-#     pickle.dump(domtimes, fp, protocol=2)
+domtimes = []
+domtimes.append(dom_sg1)
+domtimes.append(dom_sg2)
+with open('FigureObject.fig_domtimes.pickle', "wb") as fp:
+    pickle.dump(domtimes, fp, protocol=2)
 
-
+plt.show()

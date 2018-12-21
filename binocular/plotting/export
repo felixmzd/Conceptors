@@ -1,0 +1,41 @@
+from matplotlib.pyplot import *
+import pickle
+from matplotlib2tikz import save as tikz_save
+
+
+data = pickle.load(open('figure_sourcefiles/FigureObject.fig_rawinput.pickle', 'rb'))
+
+###
+# plot raw input of binocular rivalry condition
+fig_rawinput = figure()
+subplots_adjust( hspace=1 )
+# sinewave 1
+subplot(4,1,1)
+ylim([-4.5,4.5])
+yticks(np.arange(-4, 5, 2.0))
+plot(data[0], color='black')
+title('Sinewave with period 13.19')
+
+
+# sinewave 2
+subplot(4,1,2)
+ylim([-4.5,4.5])
+yticks(np.arange(-4, 5, 2.0))
+plot(data[1], color='black')
+title('Sinewave with period 4.83')
+
+# noise
+subplot(4,1,3)
+ylim([-4.5,4.5])
+yticks(np.arange(-4, 5, 2.0))
+plot(data[2], color='black')
+title('Noise')
+
+# sum of the above
+subplot(4,1,4)
+ylim([-4.5,4.5])
+yticks(np.arange(-4, 5, 2.0))
+plot(data[3], color='black')
+title('Sum of the above')
+
+tikz_save('figure_tikz/fig_rawinput.tex', figureheight='3cm', figurewidth='10cm')
