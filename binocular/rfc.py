@@ -15,9 +15,9 @@ for p in [53, 54, 10, 36]:
 
 reservoir = ReservoirRandomFeatureConceptor.init_random()
 reservoir.fit(patterns)
-reservoir.recall()
+Y_recalls = reservoir.recall()
 
-allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, reservoir.Y_recalls)
+allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, Y_recalls)
 
 results = [allDriverPL, allRecallPL, reservoir.C, reservoir.c_colls]
 

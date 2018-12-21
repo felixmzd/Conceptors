@@ -8,7 +8,8 @@ from . import utils
 
 class ReservoirRandomFeatureConceptor:
 
-    def __init__(self, F, G_star, W_bias, regressor, alpha=10, inp_scale=1.2):
+    def __init__(self, F, G_star, W_bias, regressor, aperture=10, inp_scale=1.2, t_learn=400, t_learn_conceptor=2000,
+                 t_wash=200, c_adapt_rate=0.5):
         """
 
         Args:
@@ -16,7 +17,7 @@ class ReservoirRandomFeatureConceptor:
             G_star:
             W_bias:
             regressor: The model used to learn the mapping from the reservoir space to the outputs.
-            alpha:
+            aperture:
             inp_scale:
         """
         self.F = F
@@ -25,104 +26,93 @@ class ReservoirRandomFeatureConceptor:
 
         self.M, self.N = F.shape
 
-        self.alpha = alpha
+        self.aperture = aperture
         self.inp_scale = inp_scale
         self.regressor = regressor
         self.C = []
+        self.t_learn = t_learn
+        self.t_learn_conceptor = t_learn_conceptor
+        self.t_wash = t_wash
+        self.c_adapt_rate = c_adapt_rate
         self.n_patterns = None
-        self.n_ip_dim = None
+        self.n_input_dimensions = None
         self.c_colls = None
 
     @classmethod
-    def init_random(cls, N=100, M=500, NetSR=1.4, bias_scale=0.2, alpha=8, inp_scale=1.2):
+    def init_random(cls, N=100, M=500, NetSR=1.4, bias_scale=0.2, aperture=8, inp_scale=1.2):
         F, G_star, W_bias = ReservoirRandomFeatureConceptor._generate_connection_matrices(N, M, NetSR, bias_scale)
-        return cls(F, G_star, W_bias, Ridge(alpha=1), alpha, inp_scale)
+        return cls(F, G_star, W_bias, Ridge(alpha=1), aperture, inp_scale)
 
-    def fit(self, patterns, t_learn=400, t_learn_conceptor=2000, t_wash=200, TyA_wload=0.01,
-            load=True, c_adapt_rate=0.5):
+    def fit(self, patterns, TyA_wload=0.01):
         """
 
         Args:
             patterns:
-            t_learn: Number of learning time steps.
-            t_learn_conceptor: Number of conceptor learning steps.
-            t_wash: Number of washout time steps.
+            self.t_learn: Number of learning time steps.
+            self.t_learn_conceptor: Number of conceptor learning steps.
+            self.t_wash: Number of washout time steps.
             TyA_wload:
             load:
-            c_adapt_rate:
+            self.c_adapt_rate:
 
         Returns:
 
         """
 
         self.n_patterns = len(patterns)
-        self.n_ip_dim = self._get_n_ip_dim(patterns)
-        self.W_in = self.inp_scale * np.random.randn(self.N, self.n_ip_dim)
-        self.c_colls = np.zeros([self.n_patterns, self.M, t_learn_conceptor])
-        features = np.zeros([self.N, self.n_patterns * t_learn])
-        targets = np.zeros([self.n_ip_dim, self.n_patterns * t_learn])
-        old_features = np.zeros([self.M, self.n_patterns * t_learn])
+        self.n_input_dimensions = 1
+        self.W_in = self.inp_scale * np.random.randn(self.N, self.n_input_dimensions)
+        self.c_colls = np.zeros([self.n_patterns, self.M, self.t_learn_conceptor])
+        self.targets = np.zeros([self.n_input_dimensions,
+                                 self.n_patterns * self.t_learn])  # TODO transpose dimensions so we have n_samples x n_features
+        self.all_z_scaled_collected = np.zeros([self.M, self.n_patterns * self.t_learn])
 
-        self.all_t = np.zeros([self.N, self.n_patterns * t_learn])
+        self.all_preactivations = np.zeros(
+            [self.N, self.n_patterns * self.t_learn])  # Collects recurrent_input + external_input
+        self.features = np.zeros([self.N, self.n_patterns * self.t_learn])
         for i, pattern in enumerate(patterns):
-            self._learn_one_pattern(pattern, i, c_adapt_rate, t_learn, t_learn_conceptor, t_wash, features, targets,
-                                    old_features)
+            self._learn_one_pattern(pattern, i)
 
-        if load:
-            self._train_regressor(features, targets)
-            self._adapt_G(TyA_wload, old_features)
+        self._train_regressor()
+        self._load_weight_matrix(TyA_wload)
 
-    # TODO this method might also be avoided by a unified pattern interface.
-    def _get_n_ip_dim(self, patterns):
-
-        if isinstance(patterns[0], np.ndarray):
-            n_ip_dim = len(patterns[0][0])
-        else:
-            if isinstance(patterns[0](0), np.float64):
-                n_ip_dim = 1
-            else:
-                n_ip_dim = len(patterns[0](0))
-        return n_ip_dim
-
-    def _adapt_G(self, TyA_wload, old_features):
-        """Adapt weights to be able to generate output while driving with random input."""
-        G_features = old_features
-        G_targets = self.all_t
-        self.G = utils.RidgeWload(G_features, G_targets, TyA_wload)
-        self.NRMSE_load = utils.NRMSE(self.G @ old_features, G_targets)
-        txt = f'Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}'
-        print(txt)
-
-    def _train_regressor(self, features, targets):
+    def _train_regressor(self):
         """Output Training with linear regression."""
-        self.regressor.fit(features.T, targets.flatten())
-        self.NRMSE_readout = utils.NRMSE(self.regressor.predict(features.T)[None, :], targets)
+        self.regressor.fit(self.features.T, self.targets.flatten())
+        self.NRMSE_readout = utils.NRMSE(self.regressor.predict(self.features.T)[None, :], self.targets)
         txt = f'NRMSE for output training = {self.NRMSE_readout}'
         print(txt)
 
-    def _learn_one_pattern(self, pattern, i, c_adapt_rate, t_learn, t_learn_conceptor, t_wash, features, targets,
-                           old_features):
+    def _load_weight_matrix(self, TyA_wload):
+        """Adapt weights to be able to generate output while driving with random input."""
+        self.G = Ridge(TyA_wload).fit(self.all_z_scaled_collected.T, self.all_preactivations.T).coef_
+        self.NRMSE_load = utils.NRMSE(self.G @ self.all_z_scaled_collected, self.all_preactivations)
+        txt = f'Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}'
+        print(txt)
+
+    def _learn_one_pattern(self, pattern, i):
         self.z_scaled = np.zeros([self.M])
-        self.r_collected = np.zeros([self.N, t_learn])
-        self.c_collected = np.zeros([self.M, t_learn_conceptor])
-        self.u_collected = np.zeros([self.n_ip_dim, t_learn])
-        self.z_scaled_collected = np.zeros([self.M, t_learn])
-        self.t_collected = np.zeros([self.N, t_learn])
+        self.r_collected = np.zeros([self.N, self.t_learn])
+        self.c_collected = np.zeros([self.M, self.t_learn_conceptor])
+        self.u_collected = np.zeros([self.n_input_dimensions, self.t_learn])
+        self.z_scaled_collected = np.zeros([self.M, self.t_learn])
+        self.preactivations_collected = np.zeros([self.N, self.t_learn])
         self.c = np.ones([self.M])
-        for t in range(t_learn + t_learn_conceptor + t_wash):
-            self._learn_one_step(pattern, t, t_learn_conceptor, t_wash, c_adapt_rate)
+        for t in range(self.t_learn + self.t_learn_conceptor + self.t_wash):
+            self._learn_one_step(pattern, t)
+
         self.C.append(self.c)
-        collection_index = slice(i * t_learn, (i + 1) * t_learn)
-        features[:, collection_index] = self.r_collected
-        targets[:, collection_index] = self.u_collected
-        old_features[:, collection_index] = self.z_scaled_collected
+        collection_index = slice(i * self.t_learn, (i + 1) * self.t_learn)
+        self.features[:, collection_index] = self.r_collected
+        self.targets[:, collection_index] = self.u_collected
+        self.all_z_scaled_collected[:, collection_index] = self.z_scaled_collected
         # needed to recompute G
-        self.all_t[:, collection_index] = self.t_collected
+        self.all_preactivations[:, collection_index] = self.preactivations_collected
         # plot adaptation of c?
         self.c_colls[i, ...] = self.c_collected
 
-    def _learn_one_step(self, pattern, t, t_learn_conceptor, t_wash, c_adapt_rate):
-        u = self._get_pattern_value(pattern, t)  # TODO maybe this should be handled in a unified pattern interface.
+    def _learn_one_step(self, pattern, t):
+        u = pattern(t)
         z_scaled_old = self.z_scaled
         recurrent_input = self.G_star @ self.z_scaled
         external_input = self.W_in @ u
@@ -130,30 +120,22 @@ class ReservoirRandomFeatureConceptor:
         r = np.tanh(recurrent_input + external_input + self.W_bias)
         # Project to feature space.
         z = self.F @ r
-        # Scale by conceptor weights.
+        # Scale by conception weights.
         self.z_scaled = self.c * z
         # This is probably all state harvesting.
-        in_conceptor_learning_phase = t_wash < t <= (t_wash + t_learn_conceptor)
-        in_regressor_learning_phase = (t_wash + t_learn_conceptor) <= t
+        in_conceptor_learning_phase = self.t_wash < t <= (self.t_wash + self.t_learn_conceptor)
+        in_regressor_learning_phase = (self.t_wash + self.t_learn_conceptor) < t
         if in_conceptor_learning_phase:
-            self.c += c_adapt_rate * (
-                    (self.z_scaled - self.c * self.z_scaled) * self.z_scaled - (self.alpha ** -2) * self.c)
-            self.c_collected[:, t - t_wash - 1] = self.c
-        # TODO shouldnt this be elif? Currently there is one step overlap because of the equals condition.
-        if in_regressor_learning_phase:
-            offset = t - t_wash - t_learn_conceptor
+            self.c += self.c_adapt_rate * (
+                    (self.z_scaled - self.c * self.z_scaled) * self.z_scaled - (self.aperture ** -2) * self.c)
+            self.c_collected[:, t - self.t_wash - 1] = self.c
+        elif in_regressor_learning_phase:
+            offset = t - self.t_wash - self.t_learn_conceptor
 
             self.r_collected[:, offset] = r
             self.z_scaled_collected[:, offset] = z_scaled_old
             self.u_collected[:, offset] = u
-            self.t_collected[:, offset] = recurrent_input + external_input
-
-    def _get_pattern_value(self, pattern, t):
-        if isinstance(pattern, np.ndarray):
-            value = pattern[t]
-        else:
-            value = np.reshape(pattern(t), self.n_ip_dim)
-        return value
+            self.preactivations_collected[:, offset] = recurrent_input + external_input
 
     def recall(self, t_washout=200, t_recall=200):
 
@@ -171,7 +153,7 @@ class ReservoirRandomFeatureConceptor:
         for t in range(t_washout):
             z_scaled, _ = self._run_conceptor(c, z_scaled)
 
-        y_recall = np.zeros([t_recall, self.n_ip_dim])
+        y_recall = np.zeros([t_recall, self.n_input_dimensions])
         for t in range(t_recall):
             z_scaled, r = self._run_conceptor(c, z_scaled)
             y_recall[t] = self.regressor.predict(r[None, :])
