@@ -9,7 +9,7 @@ from . import utils
 class ReservoirRandomFeatureConceptor:
 
     def __init__(self, F, G_star, W_bias, regressor, aperture=10, inp_scale=1.2, t_learn=400, t_learn_conceptor=2000,
-                 t_wash=200, c_adapt_rate=0.5):
+                 t_wash=200, c_adapt_rate=0.5, alpha_wload=0.01):
         """
 
         Args:
@@ -37,13 +37,14 @@ class ReservoirRandomFeatureConceptor:
         self.n_patterns = None
         self.n_input_dimensions = None
         self.c_colls = None
+        self.alpha_wload = alpha_wload
 
     @classmethod
     def init_random(cls, N=100, M=500, NetSR=1.4, bias_scale=0.2, aperture=8, inp_scale=1.2):
         F, G_star, W_bias = ReservoirRandomFeatureConceptor._generate_connection_matrices(N, M, NetSR, bias_scale)
         return cls(F, G_star, W_bias, Ridge(alpha=1), aperture, inp_scale)
 
-    def fit(self, patterns, TyA_wload=0.01):
+    def fit(self, patterns):
         """
 
         Args:
@@ -74,7 +75,7 @@ class ReservoirRandomFeatureConceptor:
             self._learn_one_pattern(pattern, i)
 
         self._train_regressor()
-        self._load_weight_matrix(TyA_wload)
+        self._load_weight_matrix()
 
     def _train_regressor(self):
         """Output Training with linear regression."""
@@ -83,9 +84,9 @@ class ReservoirRandomFeatureConceptor:
         txt = f'NRMSE for output training = {self.NRMSE_readout}'
         print(txt)
 
-    def _load_weight_matrix(self, TyA_wload):
+    def _load_weight_matrix(self):
         """Adapt weights to be able to generate output while driving with random input."""
-        self.G = Ridge(TyA_wload).fit(self.all_z_scaled_collected.T, self.all_preactivations.T).coef_
+        self.G = Ridge(self.alpha_wload).fit(self.all_z_scaled_collected.T, self.all_preactivations.T).coef_
         self.NRMSE_load = utils.NRMSE(self.G @ self.all_z_scaled_collected, self.all_preactivations)
         txt = f'Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}'
         print(txt)
