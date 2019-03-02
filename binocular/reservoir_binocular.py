@@ -352,8 +352,9 @@ class ReservoirBinocular:
         discrepancy2 = 0.5
         discrepancy3 = 0.5
 
-        SNR = 0.5
-        noise_level = np.sqrt(np.var(self.all_train['p']) / SNR)
+        SNR = 1
+        # SNR = 2
+        noise_level = np.std(self.all_train['p']) / SNR
 
         trust_smooth_rate = 0.99
         trust_adapt_steepness12 = 8
