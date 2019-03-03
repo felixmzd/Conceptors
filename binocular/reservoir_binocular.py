@@ -3,274 +3,229 @@ import numpy as np
 import scipy.sparse.linalg as lin
 
 from binocular import utils
+from .reservoir_rfc import ReservoirRandomFeatureConceptor
+from sklearn.linear_model import Ridge
 
 
-def _generate_connection_matrices(N, M, NetSR, bias_scale):
-    F_raw, G_star_raw, spectral_radius = _init_connection_weights(N, M)
-    F_raw, G_star_raw = _rescale_connection_weights(F_raw, G_star_raw, spectral_radius)
+class ReservoirBinocular(ReservoirRandomFeatureConceptor):
 
-    F = math.sqrt(NetSR) * F_raw
-    G_star = math.sqrt(NetSR) * G_star_raw
-    W_bias = bias_scale * np.random.randn(N)
+    # def __init__(self, F, G_star, W_bias, alpha=10, inp_scale=1.2):
 
-    return F, G_star, W_bias
+    # def fit(self, patterns, t_learn=600, t_learnc=2000, t_wash=200, TyA_wout=1, TyA_wload=0.01, c_adapt_rate=0.5):
+    #     """Feed input, learn output weights, adapt weights."""
+    #     self.patterns = patterns
+    #     self.t_learn = t_learn
+    #     self.t_learnc = t_learnc
+    #     self.t_wash = t_wash
+    #     self.TyA_wout = TyA_wout
+    #     self.TyA_wload = TyA_wload
+    #     self.c_adapt_rate = c_adapt_rate
+    #     self.n_patts = len(self.patterns)
+    #
+    #     ### variable name dictioanry: ###
+    #     #
+    #     # Variables:
+    #     # p: input to the reservoir
+    #     # r: state of the neurons in the reservoir pool
+    #     # phi: result of mapping from reservoir to feature neurons by F
+    #     # c: conception weights
+    #     # c_phi: activations in feature space, resulting from applying conceptor
+    #     #        weights c to phi.
+    #     # z: result of mapping feature space activations to reservoir space by G
+    #     #
+    #     # Mappings:
+    #     # F: from reservoir neuron pool to feature neuron pool
+    #     # G: from feature neuron pool to reservoir neuron pool
+    #
+    #     # space to store network related data from driving with random input
+    #     # this is used to rescale G
+    #     self.all_rand = {}
+    #     self.all_rand['r'] = np.zeros([self.N, self.n_patts * self.t_learn])
+    #     self.all_rand['p'] = np.zeros([1, self.n_patts * self.t_learn])
+    #     self.all_rand['z'] = np.zeros([self.N, self.n_patts * self.t_learn])
+    #     self.all_rand['old_cphi'] = np.zeros([self.M, self.n_patts * self.t_learn])
+    #
+    #     # checks whether input is delivered in array or by function handle
+    #     # and sets input dimensionality
+    #     if isinstance(self.patterns[0], np.ndarray):
+    #         self.n_ip_dim = len(patterns[0][0])
+    #     else:
+    #         if type(self.patterns[0](0)) == np.float64:
+    #             self.n_ip_dim = 1
+    #         else:
+    #             self.n_ip_dim = len(self.patterns[0](0))
+    #
+    #             # draw input weights according to input dimensionality
+    #     self.W_in = self.inp_scale * np.random.randn(self.N, self.n_ip_dim)
+    #     #######################################################################
+    #     # old_cphi == recurrent_input
+    #     # drive reservoir with random input
+    #     rando = {}
+    #     for i, p in enumerate(self.patterns):
+    #         rando['r'] = np.zeros([self.N, self.t_learn])
+    #         rando['p'] = np.zeros([1, self.t_learn])
+    #         rando['z'] = np.zeros([self.N, self.t_learn])
+    #         rando['old_cphi'] = np.zeros([self.M, self.t_learn])
+    #         cphi = np.zeros([self.M])
+    #
+    #         for t in range(self.t_learn + self.t_learnc + self.t_wash):
+    #             p = 2 * np.random.rand() - 1
+    #             old_cphi = cphi
+    #             z = self.G_star @ cphi
+    #             r = np.tanh(z + np.squeeze(self.W_in * p) + self.W_bias)
+    #             cphi = self.F @ r  # c is the identity in the random driving condition,
+    #             # therefore dismissed here
+    #
+    #             if t >= self.t_wash + self.t_learnc:
+    #                 offset = (self.t_wash + self.t_learnc)
+    #                 rando['r'][:, t - offset] = r
+    #                 rando['p'][:, t - offset] = p
+    #                 rando['z'][:, t - offset] = z
+    #                 rando['old_cphi'][:, t - offset] = np.squeeze(old_cphi)
+    #
+    #         self.all_rand['r'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['r']
+    #         self.all_rand['p'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['p']
+    #         self.all_rand['z'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['z']
+    #         self.all_rand['old_cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['old_cphi']
+    #
+    #     # recompute G
+    #     features = self.all_rand['old_cphi']
+    #     targets = self.all_rand['z']
+    #     self.G = utils.RidgeWload(features, targets, 0.1)
+    #     nrmse_g = np.mean(utils.NRMSE(self.G @ features, targets))
+    #     txt = 'NRMSE for recomputing G = {0}'.format(nrmse_g)
+    #     print(txt)
+    #
+    #     #######################################################################
+    #
+    #     I = np.eye(self.N)
+    #     self.C = []
+    #
+    #     # space to store network related data from training
+    #     self.all_train = {}
+    #     self.all_train['r'] = np.zeros([self.N, self.n_patts * self.t_learn])
+    #     self.all_train['old_r'] = np.zeros([self.N, self.n_patts * self.t_learn])
+    #     self.all_train['cphi'] = np.zeros([self.M, self.n_patts * self.t_learn])
+    #     self.all_train['old_cphi'] = np.zeros([self.M, self.n_patts * self.t_learn])
+    #     self.all_train['z'] = np.zeros([self.N, self.n_patts * self.t_learn])
+    #     self.all_train['p'] = np.zeros([1, self.n_patts * self.t_learn])
+    #
+    #     self.cColls = np.zeros([self.n_patts, self.M, self.t_learnc])
+    #     self.raw_Z = np.zeros([self.M, self.n_patts])
+    #     train = {}
+    #     for i, p in enumerate(self.patterns):
+    #         train['r'] = np.zeros([self.N, self.t_learn])
+    #         train['old_r'] = np.zeros([self.N, self.t_learn])
+    #         train['phi'] = np.zeros([self.M, self.t_learn])
+    #         train['cphi'] = np.zeros([self.M, self.t_learn])
+    #         train['old_cphi'] = np.zeros([self.M, self.t_learn])
+    #         train['p'] = np.zeros([1, self.t_learn])
+    #         train['c'] = np.zeros([self.M, self.t_learnc])
+    #         train['z'] = np.zeros([self.N, self.t_learn])
 
+    #     r = np.zeros([self.N])
+    #     c = np.ones([self.M])
+    #     cphi = np.zeros([self.M])
+    #
+    #     for t in range(self.t_learn + self.t_learnc + self.t_wash):
+    #         if not type(p) == np.ndarray:
+    #             u = np.reshape(p(t), self.n_ip_dim)
+    #         else:
+    #             u = p[t]
+    #         old_cphi = cphi
+    #         old_r = r
+    #         z = self.G @ cphi
+    #         r = np.tanh(z + self.W_in @ u + self.W_bias)
+    #         phi = self.F @ r
+    #         cphi = c * phi
+    #
+    #         if self.t_wash < t <= self.t_learnc + self.t_wash:
+    #             c = c + self.c_adapt_rate * ((cphi - c * cphi) * cphi - math.pow(self.aperture, -2) * c)
+    #             train['c'][:, (t - self.t_wash) - 1] = c
+    #
+    #         if t >= self.t_wash + self.t_learnc:
+    #             offset = t - (self.t_wash + self.t_learnc)
+    #
+    #             train['r'][:, offset] = r
+    #             train['old_r'][:, offset] = old_r
+    #             train['phi'][:, offset] = phi
+    #             train['cphi'][:, offset] = cphi
+    #             train['old_cphi'][:, offset] = old_cphi
+    #             train['p'][:, offset] = u
+    #             train['z'][:, offset] = z
+    #
+    #     self.C.append(c)
+    #
+    #     self.all_train['r'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['r']
+    #     self.all_train['old_r'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['old_r']
+    #     self.all_train['p'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['p']
+    #     self.all_train['z'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['z']
+    #     self.all_train['cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['cphi']
+    #     self.all_train['old_cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['old_cphi']
+    #
+    #     signal_energy = np.power(train['old_cphi'], 2)
+    #     self.raw_Z[:, i] = np.mean(signal_energy, axis=1)
+    #
+    # # compute feature space energies for every pattern
+    # # they are used to indirectly compose a weighted disjunction of the prototype conception weight vectors
+    # # together with the aperture the mean signal energies define a conception weight vector
+    # # Feature space energy is a meaure for how well the conceptor fits the activations.
+    # # normalize
+    # norms_Z = np.sqrt(np.sum(np.power(self.raw_Z, 2), axis=0))
+    # mean_norms_Z = np.mean(norms_Z)
+    # txt = 'Mean feature space energys for every pattern = {0}'.format(norms_Z)
+    # print(txt)
+    # # prototype mean signal energy vector matrix
+    # self.Z = (self.raw_Z @ np.diag(1. / norms_Z)) * mean_norms_Z
+    #
+    # # Output Training with linear regression.
+    # features = self.all_train['r']
+    # targets = self.all_train['p']
+    # self.W_out = utils.RidgeWout(features, targets, self.TyA_wout)
+    # self.NRMSE_readout = utils.NRMSE(np.dot(self.W_out, features), targets)
+    # txt = 'NRMSE for output training = {0}'.format(self.NRMSE_readout)
+    # print(txt)
+    #
+    # # Loading
+    # # Adapt weights to be able to generate output while driving with random input.
+    # features = self.all_train['old_cphi']
+    # targets = self.all_train['p']
+    # self.D = utils.RidgeWload(features, targets, self.TyA_wload)
+    # self.NRMSE_load = utils.NRMSE(np.dot(self.D, features), targets)
+    # txt = 'Mean NRMSE per neuron for recomputing D = {0}'.format(np.mean(self.NRMSE_load))
+    # print(txt)
 
-def _init_connection_weights(N, M):
-    success = False
-    while not success:
-        try:
-            F_raw = np.random.randn(M, N)
-            G_star_raw = np.random.randn(N, M)
-            GF = G_star_raw @ F_raw
-            spectral_radius, eigenvecs = np.abs(lin.eigs(GF, 1))
-            success = True
-        except Exception as ex:  # TODO what exceptions can happen here.
-            print('Retrying to generate internal weights.')
-            print(ex)
+    def _init_history(self):
+        super()._init_history()
+        self.history["recurrent_input"] = np.zeros([self.n_patterns, self.t_learn_regressor, self.M])
 
-    return F_raw, G_star_raw, spectral_radius
+    def _write_history(self, offset, external_input, pattern_idx, r, recurrent_input, t, u, z_scaled_old):
+        super()._write_history(offset, external_input, pattern_idx, r, recurrent_input, t, u, z_scaled_old)
+        # self.history["recurrent_input"][pattern_idx, offset] = recurrent_input
 
-
-def _rescale_connection_weights(F_raw, G_star_raw, spectral_radius):
-    F_raw = F_raw / math.sqrt(spectral_radius)
-    G_star_raw = G_star_raw / math.sqrt(spectral_radius)
-    return F_raw, G_star_raw
-
-
-class ReservoirBinocular:
-
-    def __init__(self, F, G_star, W_bias, alpha=10, inp_scale=1.2):
-
-        self.F = F
-        self.G_star = G_star
-        self.W_bias = W_bias
-
-        self.M, self.N = F.shape
-
-        self.alpha = alpha
-        self.inp_scale = inp_scale
-
-    @classmethod
-    def init_random(cls, N=100, M=700, NetSR=1.4, bias_scale=0.2, alpha=10, inp_scale=1.2):
-        F, G_star, W_bias = _generate_connection_matrices(N, M, NetSR, bias_scale)
-        return cls(F, G_star, W_bias, alpha, inp_scale)
-
-    def fit(self, patterns, t_learn=600, t_learnc=2000, t_wash=200, TyA_wout=1, TyA_wload=0.01, c_adapt_rate=0.5):
-        """Feed input, learn output weights, adapt weights."""
+    def fit(self, patterns):
+        super().fit(patterns)
         self.patterns = patterns
-        self.t_learn = t_learn
-        self.t_learnc = t_learnc
-        self.t_wash = t_wash
-        self.TyA_wout = TyA_wout
-        self.TyA_wload = TyA_wload
-        self.c_adapt_rate = c_adapt_rate
-        self.n_patts = len(self.patterns)
-
-        ### variable name dictioanry: ###
-        #
-        # Variables:
-        # p: input to the reservoir
-        # r: state of the neurons in the reservoir pool
-        # phi: result of mapping from reservoir to feature neurons by F
-        # c: conception weights
-        # c_phi: activations in feature space, resulting from applying conceptor
-        #        weights c to phi.
-        # z: result of mapping feature space activations to reservoir space by G
-        #
-        # Mappings:
-        # F: from reservoir neuron pool to feature neuron pool
-        # G: from feature neuron pool to reservoir neuron pool
-
-        # space to store network related data from driving with random input
-        # this is used to rescale G
-        self.all_rand = {}
-        self.all_rand['r'] = np.zeros([self.N, self.n_patts * self.t_learn])
-        self.all_rand['p'] = np.zeros([1, self.n_patts * self.t_learn])
-        self.all_rand['z'] = np.zeros([self.N, self.n_patts * self.t_learn])
-        self.all_rand['old_cphi'] = np.zeros([self.M, self.n_patts * self.t_learn])
-
-        # checks whether input is delivered in array or by function handle
-        # and sets input dimensionality
-        if isinstance(self.patterns[0], np.ndarray):
-            self.n_ip_dim = len(patterns[0][0])
-        else:
-            if type(self.patterns[0](0)) == np.float64:
-                self.n_ip_dim = 1
-            else:
-                self.n_ip_dim = len(self.patterns[0](0))
-
-                # draw input weights according to input dimensionality
-        self.W_in = self.inp_scale * np.random.randn(self.N, self.n_ip_dim)
-        #######################################################################
-
-        # drive reservoir with random input
-        rando = {}
-        for i, p in enumerate(self.patterns):
-            rando['r'] = np.zeros([self.N, self.t_learn])
-            rando['p'] = np.zeros([1, self.t_learn])
-            rando['z'] = np.zeros([self.N, self.t_learn])
-            rando['old_cphi'] = np.zeros([self.M, self.t_learn])
-            cphi = np.zeros([self.M])
-
-            for t in range(self.t_learn + self.t_learnc + self.t_wash):
-                p = 2 * np.random.rand() - 1
-                old_cphi = cphi
-                z = self.G_star @ cphi
-                r = np.tanh(z + np.squeeze(self.W_in * p) + self.W_bias)
-                cphi = self.F @ r  # c is the identity in the random driving condition,
-                # therefore dismissed here
-
-                if t >= self.t_wash + self.t_learnc:
-                    offset = (self.t_wash + self.t_learnc)
-                    rando['r'][:, t - offset] = r
-                    rando['p'][:, t - offset] = p
-                    rando['z'][:, t - offset] = z
-                    rando['old_cphi'][:, t - offset] = np.squeeze(old_cphi)
-
-            self.all_rand['r'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['r']
-            self.all_rand['p'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['p']
-            self.all_rand['z'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['z']
-            self.all_rand['old_cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = rando['old_cphi']
-
-        # recompute G
-        features = self.all_rand['old_cphi']
-        targets = self.all_rand['z']
-        self.G = utils.RidgeWload(features, targets, 0.1)
-        nrmse_g = np.mean(utils.NRMSE(self.G @ features, targets))
-        txt = 'NRMSE for recomputing G = {0}'.format(nrmse_g)
-        print(txt)
-
-        #######################################################################
-
-        I = np.eye(self.N)
-        self.C = []
-
-        # space to store network related data from training
-        self.all_train = {}
-        self.all_train['r'] = np.zeros([self.N, self.n_patts * self.t_learn])
-        self.all_train['old_r'] = np.zeros([self.N, self.n_patts * self.t_learn])
-        self.all_train['cphi'] = np.zeros([self.M, self.n_patts * self.t_learn])
-        self.all_train['old_cphi'] = np.zeros([self.M, self.n_patts * self.t_learn])
-        self.all_train['z'] = np.zeros([self.N, self.n_patts * self.t_learn])
-        self.all_train['p'] = np.zeros([1, self.n_patts * self.t_learn])
-
-        self.cColls = np.zeros([self.n_patts, self.M, self.t_learnc])
-        self.raw_Z = np.zeros([self.M, self.n_patts])
-        train = {}
-        for i, p in enumerate(self.patterns):
-            train['r'] = np.zeros([self.N, self.t_learn])
-            train['old_r'] = np.zeros([self.N, self.t_learn])
-            train['phi'] = np.zeros([self.M, self.t_learn])
-            train['cphi'] = np.zeros([self.M, self.t_learn])
-            train['old_cphi'] = np.zeros([self.M, self.t_learn])
-            train['p'] = np.zeros([1, self.t_learn])
-            train['c'] = np.zeros([self.M, self.t_learnc])
-            train['z'] = np.zeros([self.N, self.t_learn])
-
-            r = np.zeros([self.N])
-            c = np.ones([self.M])
-            cphi = np.zeros([self.M])
-
-            for t in range(self.t_learn + self.t_learnc + self.t_wash):
-                if not type(p) == np.ndarray:
-                    u = np.reshape(p(t), self.n_ip_dim)
-                else:
-                    u = p[t]
-                old_cphi = cphi
-                old_r = r
-                z = self.G @ cphi
-                r = np.tanh(z + self.W_in @ u + self.W_bias)
-                phi = self.F @ r
-                cphi = c * phi
-
-                if self.t_wash < t <= self.t_learnc + self.t_wash:
-                    c = c + self.c_adapt_rate * ((cphi - c * cphi) * cphi - math.pow(self.alpha, -2) * c)
-                    train['c'][:, (t - self.t_wash) - 1] = c
-
-                if t >= self.t_wash + self.t_learnc:
-                    offset = t - (self.t_wash + self.t_learnc)
-
-                    train['r'][:, offset] = r
-                    train['old_r'][:, offset] = old_r
-                    train['phi'][:, offset] = phi
-                    train['cphi'][:, offset] = cphi
-                    train['old_cphi'][:, offset] = old_cphi
-                    train['p'][:, offset] = u
-                    train['z'][:, offset] = z
-
-            self.C.append(c)
-
-            self.all_train['r'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['r']
-            self.all_train['old_r'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['old_r']
-            self.all_train['p'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['p']
-            self.all_train['z'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['z']
-            self.all_train['cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['cphi']
-            self.all_train['old_cphi'][:, i * self.t_learn:(i + 1) * self.t_learn] = train['old_cphi']
-
-            signal_energy = np.power(train['old_cphi'], 2)
-            self.raw_Z[:, i] = np.mean(signal_energy, axis=1)
-
-        # compute feature space energies for every pattern
-        # they are used to indirectly compose a weighted disjunction of the prototype conception weight vectors
-        # together with the aperture the mean signal energies define a conception weight vector
-        # Feature space energy is a meaure for how well the conceptor fits the activations.
-        # normalize
-        norms_Z = np.sqrt(np.sum(np.power(self.raw_Z, 2), axis=0))
+        # Compute feature space energies for every pattern.
+        # They are used to indirectly compose a weighted disjunction of the prototype conception weight vectors
+        # together with the aperture the mean signal energies define a conception weight vector.
+        # Feature space energy is a measure for how well the conceptor fits the activations.
+        signal_energy = self.history["z_scaled"] ** 2
+        # mean signal energy for every pattern.
+        self.raw_Z = np.mean(signal_energy, axis=1)
+        norms_Z = np.sqrt(np.sum(self.raw_Z ** 2, axis=-1))
         mean_norms_Z = np.mean(norms_Z)
-        txt = 'Mean feature space energys for every pattern = {0}'.format(norms_Z)
-        print(txt)
+        print('Mean feature space energies for every pattern = {0}'.format(norms_Z))
         # prototype mean signal energy vector matrix
-        self.Z = (self.raw_Z @ np.diag(1. / norms_Z)) * mean_norms_Z
+        self.Z = (self.raw_Z.T @ np.diag(1.0 / norms_Z)) * mean_norms_Z
 
-        # Output Training with linear regression.
-        features = self.all_train['r']
-        targets = self.all_train['p']
-        self.W_out = utils.RidgeWout(features, targets, self.TyA_wout)
-        self.NRMSE_readout = utils.NRMSE(np.dot(self.W_out, features), targets)
-        txt = 'NRMSE for output training = {0}'.format(self.NRMSE_readout)
-        print(txt)
-
-        # Loading
-        # Adapt weights to be able to generate output while driving with random input.
-        features = self.all_train['old_cphi']
-        targets = self.all_train['p']
-        self.D = utils.RidgeWload(features, targets, self.TyA_wload)
-        self.NRMSE_load = utils.NRMSE(np.dot(self.D, features), targets)
-        txt = 'Mean NRMSE per neuron for recomputing D = {0}'.format(np.mean(self.NRMSE_load))
-        print(txt)
-
-    def recall(self, t_washout=200, t_recall=200):
-        """Get conceptor for each pattern and regenerate pattern according to conceptor.
-
-        Args:
-            t_recall: Number of timesteps to recall.
-        """
-        self.Y_recalls = []
-        self.t_ctest_wash = t_washout
-        self.t_recall = t_recall
-
-        for i in range(self.n_patts):
-            c = np.asarray(self.C[i])
-            cphi = .5 * np.random.randn(self.M)
-            r = .1 * np.random.randn(self.N)
-            for t in range(self.t_ctest_wash):
-                r = np.tanh(self.G @ cphi + self.W_in @ self.D @ cphi + self.W_bias)
-                cphi = c * (self.F @ r)
-
-            y_recall = np.zeros([self.t_recall, self.n_ip_dim])
-
-            for t in range(self.t_recall):
-                r = np.tanh(self.G @ cphi + self.W_in @ self.D @ cphi + self.W_bias)
-                cphi = c * (self.F @ r)
-                y_recall[t] = self.W_out @ r
-
-            self.Y_recalls.append(y_recall)
+        features = self.history["z_scaled"].reshape(-1, self.history["z_scaled"].shape[-1])
+        targets = self.history["u"].reshape(-1)
+        self.D = Ridge(self.alpha_wload).fit(features, targets).coef_[None, :]
+        self.W_out = self.regressor.coef_[None, :]
 
     def binocular(self, t_run=4000):
 
-        # number of pattern templates for which conceptors have been learned beforehand
-        self.n_templates = 2
         self.t_run = t_run
 
         # dict for collecting various variables over all patterns
@@ -279,9 +234,9 @@ class ReservoirBinocular:
         # level of the hierarchy are denoted by 1 (bottom-) 2 (mid-) 3 (upper-) layer
 
         # hypotheses for each level about which pattern is the current driver
-        all['hypo1'] = np.zeros([self.n_templates, t_run])
-        all['hypo2'] = np.zeros([self.n_templates, t_run])
-        all['hypo3'] = np.zeros([self.n_templates, t_run])
+        all['hypo1'] = np.zeros([self.n_patterns, t_run])
+        all['hypo2'] = np.zeros([self.n_patterns, t_run])
+        all['hypo3'] = np.zeros([self.n_patterns, t_run])
 
         # trusts in the hypothesis for each level
         all['trusts1'] = np.zeros([1, t_run])
@@ -311,7 +266,7 @@ class ReservoirBinocular:
         all['y3'] = np.zeros([1, t_run])
 
         # set equal probabilities to all hypotheses initially
-        hypo1 = np.ones([1, self.n_templates])
+        hypo1 = np.ones([self.n_patterns])
         # hypo1[0][1] = 0
         hypo1 = hypo1 / np.sum(hypo1)
         # also on all levels
@@ -323,17 +278,17 @@ class ReservoirBinocular:
         t2 = self.Z @ np.power(hypo2, 2).T
         t3 = self.Z @ np.power(hypo3, 2).T
 
-        c1 = t1 / (t1 + 1 / np.power(self.alpha, 2))
-        c2 = t2 / (t2 + 1 / np.power(self.alpha, 2))
-        c3 = t3 / (t3 + 1 / np.power(self.alpha, 2))
+        c1 = t1 / (t1 + 1 / (self.aperture ** 2))
+        c2 = t2 / (t2 + 1 / (self.aperture ** 2))
+        c3 = t3 / (t3 + 1 / (self.aperture ** 2))
 
         c1_int = c1
         c2_int = c2
         c3_int = c3
 
-        cphi1 = np.zeros([self.M, 1])
-        cphi2 = np.zeros([self.M, 1])
-        cphi3 = np.zeros([self.M, 1])
+        cphi1 = np.zeros([self.M])
+        cphi2 = np.zeros([self.M])
+        cphi3 = np.zeros([self.M])
 
         y1var = 1
         y2var = 1
@@ -352,18 +307,15 @@ class ReservoirBinocular:
         discrepancy2 = 0.5
         discrepancy3 = 0.5
 
-        SNR = 1
-        # SNR = 2
-        noise_level = np.std(self.all_train['p']) / SNR
+        # SNR = 0.5
+        SNR = 1.2
+        noise_level = np.std(self.history["u"]) / SNR
 
         trust_smooth_rate = 0.99
         trust_adapt_steepness12 = 8
         trust_adapt_steepness23 = 8
         drift = 0.0001
         hypo_adapt_rate = 0.002
-
-        # WORKAROUND
-        self.W_bias = np.reshape(self.W_bias, (self.N, 1))
 
         ### Dictionary of Variables ###
         # inext
@@ -375,14 +327,24 @@ class ReservoirBinocular:
         # tru = [zer], [on]
         # truu = np.squeeze(np.tile(tru, 10))
         # print(np.shape(truu))
-
+        inaut = 0
         for t in range(t_run):
+            # TODO this is the part where the special part for binocular comes in.
+            # TODO however are we not just showing the other pattern once the system thinks
+            # is is one pattern pattern? this would mean the whole thing is just equivalent to what
+            # Jäger did...
+
             # only the part of the stimulus is fed into the system that can not be explained by the current hypothesis
-            if hypo3[0][0] > hypo3[0][1]:
+            if hypo3[0] > hypo3[1]:
                 u = 1.0 * self.patterns[1](t)
             else:
                 u = 1.0 * self.patterns[0](t)
-            noise = noise_level * np.random.randn()
+
+            # u = self.patterns[0](t) #+ self.patterns[1](t)) #- inaut  # Does not work maybe because of phase shift.
+            # u = self.patterns[1](t)
+            # u = self.patterns[0](t)*hypo3[0][1] + self.patterns[1](t)*hypo3[0][0]  # Creates to fast switching and is not plausible as well.
+            # noise = noise_level * np.random.randn()  # TODO is this noise really Gaussian?
+            noise = np.random.normal(loc=0, scale=noise_level)
 
             # LEVEL 1 #
             inext = u + noise
@@ -405,10 +367,10 @@ class ReservoirBinocular:
 
             y1mean = trust_smooth_rate * y1mean + (1 - trust_smooth_rate) * y1
             y1var = trust_smooth_rate * y1var + (1 - trust_smooth_rate) * (y1 - y1mean) ** 2
-            discrepancy1 = trust_smooth_rate * discrepancy1 + (1 - trust_smooth_rate) * (inaut - inext) ** 2 / y1var
-            c1_int = c1_int + self.c_adapt_rate * (
-                    (cphi1 - c1_int * cphi1) * cphi1 - 1 / np.power(self.alpha, 2) * c1_int)
             unexplained1 = inaut - inext
+            discrepancy1 = trust_smooth_rate * discrepancy1 + (1 - trust_smooth_rate) * unexplained1 ** 2 / y1var
+            c1_int = c1_int + self.c_adapt_rate * (
+                    (cphi1 - c1_int * cphi1) * cphi1 - 1 / np.power(self.aperture, 2) * c1_int)
 
             # LEVEL 2 #
             inaut = self.D @ cphi2
@@ -419,10 +381,10 @@ class ReservoirBinocular:
 
             y2mean = trust_smooth_rate * y2mean + (1 - trust_smooth_rate) * y2
             y2var = trust_smooth_rate * y2var + (1 - trust_smooth_rate) * (y2 - y2mean) ** 2
-            discrepancy2 = trust_smooth_rate * discrepancy2 + (1 - trust_smooth_rate) * (inaut - inext) ** 2 / y2var
-            c2_int = c2_int + self.c_adapt_rate * (
-                    (cphi2 - c2_int * cphi2) * cphi2 - 1 / np.power(self.alpha, 2) * c2_int)
             unexplained2 = inaut - inext
+            discrepancy2 = trust_smooth_rate * discrepancy2 + (1 - trust_smooth_rate) * unexplained2 ** 2 / y2var
+            c2_int = c2_int + self.c_adapt_rate * (
+                    (cphi2 - c2_int * cphi2) * cphi2 - 1 / np.power(self.aperture, 2) * c2_int)
 
             # LEVEL 3 #
             inaut = self.D @ cphi3
@@ -433,8 +395,8 @@ class ReservoirBinocular:
 
             y3mean = trust_smooth_rate * y3mean + (1 - trust_smooth_rate) * y3
             y3var = trust_smooth_rate * y3var + (1 - trust_smooth_rate) * (y3 - y3mean) ** 2
-            discrepancy3 = trust_smooth_rate * discrepancy3 + (1 - trust_smooth_rate) * (inaut - inext) ** 2 / y3var
             unexplained3 = inaut - inext
+            discrepancy3 = trust_smooth_rate * discrepancy3 + (1 - trust_smooth_rate) * unexplained3 ** 2 / y3var
 
             trust12 = (1 / (1 + (discrepancy2 / discrepancy1) ** trust_adapt_steepness12))
             trust23 = (1 / (1 + (discrepancy3 / discrepancy2) ** trust_adapt_steepness23))
@@ -458,7 +420,7 @@ class ReservoirBinocular:
             hypo3 = hypo3 + hypo_adapt_rate * d_hypo3
             hypo3 = hypo3 / np.sum(hypo3)
 
-            c3 = t3 / (t3 + 1 / np.power(self.alpha, 2))
+            c3 = t3 / (t3 + 1 / np.power(self.aperture, 2))
             c2 = trust23 * c3 + (1 - trust23) * c2_int
             c1 = trust12 * c2 + (1 - trust12) * c1_int
 

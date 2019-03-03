@@ -1,7 +1,7 @@
 """Run this script to create pickle files for plotting."""
-from binocular.reservoir_binocular_old import *
-import binocular.reservoir_binocular
+from binocular.reservoir_binocular_new import ReservoirBinocular
 from binocular import pattern_functions
+from binocular import utils
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import pickle
@@ -18,11 +18,11 @@ def main():
 
     reservoir, Y_recalls = run_reservoir(patterns, t_run=5000)
 
-    plot_and_save_loading(reservoir, patterns, Y_recalls)
-    save_driver_input(reservoir)
-    save_real_input(reservoir)
-    save_result(reservoir)
-    save_predictions(reservoir)
+    # plot_and_save_loading(reservoir, patterns, Y_recalls)
+    # save_driver_input(reservoir)
+    # save_real_input(reservoir)
+    # save_result(reservoir)
+    # save_predictions(reservoir)
     make_plots(reservoir)
 
     dominance_times = compute_dominance_times(reservoir)
@@ -32,8 +32,7 @@ def main():
 
 
 def run_reservoir(patterns, t_run):
-    # reservoir = ReservoirBinocular.init_random(N=100, M=700, NetSR=1.4, bias_scale=0.2, alpha=10, inp_scale=1.2)
-    reservoir = binocular.reservoir_binocular.ReservoirBinocular.init_random(N=100,M=700,NetSR=1.4,bias_scale=0.2,aperture=10,inp_scale=1.2,t_learn=600,t_learn_conceptor=2000,)
+    reservoir = ReservoirBinocular.init_random(N=100,M=700,NetSR=1.4,bias_scale=0.2,aperture=10,inp_scale=1.2,t_learn=600,t_learn_conceptor=2000,)
     reservoir.fit(patterns)
     Y_recalls = reservoir.recall()
     reservoir.binocular(t_run=t_run)
@@ -63,25 +62,25 @@ def plot_and_save_loading(reservoir, patterns, Y_recalls):
     with open("FigureObject.fig_loading.pickle", "wb") as fp:
         pickle.dump(loading, fp)
 
-
-def save_driver_input(reservoir):
-    driver_input = [
-        reservoir.all["driver_sine1"][:, 0:100].T,
-        reservoir.all["driver_sine2"][:, 0:100].T,
-        reservoir.all["driver_noise"][:, 0:100].T,
-        reservoir.all["driver"][:, 0:100].T,
-    ]
-    with open("FigureObject.fig_rawinput.pickle", "wb") as fp:
-        pickle.dump(driver_input, fp, protocol=2)
-
-
-def save_real_input(reservoir):
-    real_input = [
-        reservoir.all["real_input_w-o_noise"][:, 0:100].T,
-        reservoir.all["real_input"][:, 0:100].T,
-    ]
-    with open("FigureObject.fig_realinput.pickle", "wb") as fp:
-        pickle.dump(real_input, fp, protocol=2)
+#
+# def save_driver_input(reservoir):
+#     driver_input = [
+#         reservoir.all["driver_sine1"][:, 0:100].T,
+#         reservoir.all["driver_sine2"][:, 0:100].T,
+#         reservoir.all["driver_noise"][:, 0:100].T,
+#         reservoir.all["driver"][:, 0:100].T,
+#     ]
+#     with open("FigureObject.fig_rawinput.pickle", "wb") as fp:
+#         pickle.dump(driver_input, fp, protocol=2)
+#
+#
+# def save_real_input(reservoir):
+#     real_input = [
+#         reservoir.all["real_input_w-o_noise"][:, 0:100].T,
+#         reservoir.all["real_input"][:, 0:100].T,
+#     ]
+#     with open("FigureObject.fig_realinput.pickle", "wb") as fp:
+#         pickle.dump(real_input, fp, protocol=2)
 
 
 def save_result(reservoir):
@@ -93,10 +92,10 @@ def save_result(reservoir):
         reservoir.all["trusts23"],
     ]
     with open("FigureObject.fig_result.pickle", "wb") as fp:
-        pickle.dump(res, fp, protocol=2)
-
-    with open("../tests/data/FigureObject.fig_result.pickle", "wb") as fp:
         pickle.dump(res, fp)
+    #
+    # with open("../tests/data/FigureObject.fig_result_new.pickle", "wb") as fp:
+    #     pickle.dump(res, fp)
 
 
 def save_predictions(reservoir):
@@ -107,48 +106,48 @@ def save_predictions(reservoir):
 def make_plots(reservoir):
     # recall
     plt.figure()
-    plt.plot(reservoir.all["y3"][:, 3960:4000].T, color="black", label="output")
+    plt.plot(reservoir.history["y"][3960:4000, 3], color="black", label="output")
+    # plt.plot(
+    #     reservoir.all["y3"][:, 3960:4000].T - reservoir.all["driver"][:, 3960:4000].T,
+    #     color="gray",
+    #     linewidth=4.0,
+    #     label="difference",
+    # )
     plt.plot(
-        reservoir.all["y3"][:, 3960:4000].T - reservoir.all["driver"][:, 3960:4000].T,
-        color="gray",
-        linewidth=4.0,
-        label="difference",
-    )
-    plt.plot(
-        reservoir.all["driver"][:, 3960:4000].T,
+        reservoir.history["y"][3960:4000, 0],
         color="blue",
         linewidth=4.0,
         label="driver",
     )
-    plt.title("output and difference ")
-    plt.legend()
+    # plt.title("output and difference ")
+    # plt.legend()
     # discrepancys on every level
     plt.figure()
-    plt.plot(reservoir.all["trusts1"].T, "b", label="level1")
-    plt.plot(reservoir.all["trusts2"].T, "g", label="level2")
-    plt.plot(reservoir.all["trusts3"].T, "y", label="level3")
+    plt.plot(reservoir.history["trusts"][0], "b", label="level1")
+    plt.plot(reservoir.history["trusts"][1], "g", label="level2")
+    # plt.plot(reservoir.all["trusts3"].T, "y", label="level3")
     plt.title("trusts")
-    plt.figure()
-    plt.plot(reservoir.all["unexplained1"][:, 3960:4000].T, "b", label="level1")
-    plt.plot(reservoir.all["unexplained2"][:, 3960:4000].T, "g", label="level2")
-    plt.plot(reservoir.all["unexplained3"][:, 3960:4000].T, "y", label="level3")
-    # plot(reservoir.all['driver'][:, 0:500].T, 'g')
-    plt.title("unexplained")
-    plt.legend()
-
-    fig, ax = plt.subplots()
-    # ax.plot(reservoir.all["real_input"].T[1500:1600], label="real input")
-    ax.plot(
-        reservoir.all["real_input_w-o_noise"].T[1500:1600], label="input without noise"
-    )
-    ax.plot(reservoir.all["y3"].T[1500:1600], label="prediction")
-    fig.legend()
-    ax.set(title="inputs")
+    # plt.figure()
+    # plt.plot(reservoir.all["unexplained1"][:, 3960:4000].T, "b", label="level1")
+    # plt.plot(reservoir.all["unexplained2"][:, 3960:4000].T, "g", label="level2")
+    # plt.plot(reservoir.all["unexplained3"][:, 3960:4000].T, "y", label="level3")
+    # # plot(reservoir.all['driver'][:, 0:500].T, 'g')
+    # plt.title("unexplained")
+    # plt.legend()
+    #
+    # fig, ax = plt.subplots()
+    # # ax.plot(reservoir.all["real_input"].T[1500:1600], label="real input")
+    # ax.plot(
+    #     reservoir.all["real_input_w-o_noise"].T[1500:1600], label="input without noise"
+    # )
+    # ax.plot(reservoir.all["y3"].T[1500:1600], label="prediction")
+    # fig.legend()
+    # ax.set(title="inputs")
 
 
 def compute_dominance_times(reservoir):
     # Compute dominance times per signal.
-    hypo = reservoir.all["hypo3"]
+    hypo = reservoir.history["hypotheses"][:, -1]
     max_idx = np.argmax(hypo, axis=0)
     crossings = max_idx[:-1] - max_idx[1:]
     cross_idx = np.flatnonzero(crossings)

@@ -61,7 +61,16 @@ class ReservoirRandomFeatureConceptor:
 
     @classmethod
     def init_random(
-        cls, N=100, M=500, NetSR=1.4, bias_scale=0.2, aperture=8, inp_scale=1.2
+        cls,
+        N=100,
+        M=500,
+        NetSR=1.4,
+        bias_scale=0.2,
+        aperture=8,
+        inp_scale=1.2,
+        t_learn=400,
+        t_learn_conceptor=2000,
+        t_wash=200,
     ):
         F, G_star, W_bias = ReservoirRandomFeatureConceptor._generate_connection_matrices(
             N, M, NetSR, bias_scale
@@ -76,6 +85,9 @@ class ReservoirRandomFeatureConceptor:
             W_in=W_in,
             aperture=aperture,
             inp_scale=inp_scale,
+            t_learn=t_learn,
+            t_learn_conceptor=t_learn_conceptor,
+            t_wash=t_wash,
         )
 
     def fit(self, patterns: List[Callable[[int], float]]):
@@ -144,22 +156,41 @@ class ReservoirRandomFeatureConceptor:
             ]
 
         elif in_regressor_learning_phase:
-            self._write_history(external_input, pattern_idx, r, recurrent_input, t, u, z_scaled_old)
+            offset = t - self.t_wash - self.t_learn_conceptor
+            self._write_history(
+                offset,
+                external_input,
+                pattern_idx,
+                r,
+                recurrent_input,
+                t,
+                u,
+                z_scaled_old,
+            )
 
     def _adapt_conceptor(self, pattern_idx):
         self.conceptors[pattern_idx] += self.c_adapt_rate * (
-                (self.z_scaled - self.conceptors[pattern_idx] * self.z_scaled)
-                * self.z_scaled
-                - (self.aperture ** -2) * self.conceptors[pattern_idx]
+            (self.z_scaled - self.conceptors[pattern_idx] * self.z_scaled)
+            * self.z_scaled
+            - (self.aperture ** -2) * self.conceptors[pattern_idx]
         )
 
-    def _write_history(self, external_input, pattern_idx, r, recurrent_input, t, u, z_scaled_old):
-        offset = t - self.t_wash - self.t_learn_conceptor
+    def _write_history(
+        self,
+        offset,
+        external_input,
+        pattern_idx,
+        r,
+        recurrent_input,
+        t,
+        u,
+        z_scaled_old,
+    ):
         self.history["r"][pattern_idx, offset] = r
         self.history["z_scaled"][pattern_idx, offset] = z_scaled_old
         self.history["u"][pattern_idx, offset] = u
         self.history["preactivations"][pattern_idx, offset] = (
-                recurrent_input + external_input
+            recurrent_input + external_input
         )
 
     def _train_regressor(self):
