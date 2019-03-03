@@ -19,18 +19,16 @@ Y_recalls = reservoir.recall()
 
 allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, Y_recalls)
 
-results = [allDriverPL, allRecallPL, reservoir.C, reservoir.c_colls]
-
-
+results = [allDriverPL, allRecallPL, reservoir.conceptors, reservoir.history["c"]]
 
 with open('../tests/data/FigureObject.fig_rfc.pickle', "wb") as fp:
-    pickle.dump(results, fp, protocol=2)
+    pickle.dump(results, fp)
 
 # plot adaptation of c's
 for i in range(len(patterns)):
     # c spectrum
     plt.subplot(len(patterns), 3, (i + 1) * 3 - 2)
-    plt.plot(np.flipud(np.sort(reservoir.C[i])), color='black', linewidth='2')
+    plt.plot(np.flipud(np.sort(reservoir.conceptors[i])), color='black', linewidth='2')
     if (i + 1) * 3 - 2 == 1:
         plt.title('c spectrum')
 
@@ -45,10 +43,10 @@ for i in range(len(patterns)):
 
     # c adaptation
     plt.subplot(len(patterns), 3, (i + 1) * 3)
-    num_plots = 40
+    n_steps_to_plot = 40
     colormap = plt.cm.gray
-    plt.gca().set_prop_cycle(plt.cycler('color', [colormap(i) for i in np.linspace(0, 0.9, num_plots)]))
-    plt.plot(reservoir.c_colls[i, 1:num_plots, :].T)
+    plt.gca().set_prop_cycle(plt.cycler('color', [colormap(i) for i in np.linspace(0, 0.9, n_steps_to_plot)]))
+    plt.plot(reservoir.history["c"][i, :, 1:n_steps_to_plot])
     plt.ylim([-0.1, 1.1])
     if (i + 1) * 3 == 3:
         plt.title('c adaptation')

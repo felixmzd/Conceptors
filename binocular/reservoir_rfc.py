@@ -1,3 +1,4 @@
+from typing import *
 import math
 import scipy.sparse.linalg as lin
 import numpy as np
@@ -7,9 +8,21 @@ from . import utils
 
 
 class ReservoirRandomFeatureConceptor:
-
-    def __init__(self, F, G_star, W_bias, regressor, aperture=10, inp_scale=1.2, t_learn=400, t_learn_conceptor=2000,
-                 t_wash=200, c_adapt_rate=0.5, alpha_wload=0.01):
+    def __init__(
+        self,
+        F,
+        G_star,
+        W_bias,
+        regressor,
+        W_in,
+        aperture=10,
+        inp_scale=1.2,
+        t_learn=400,
+        t_learn_conceptor=2000,
+        t_wash=200,
+        c_adapt_rate=0.5,
+        alpha_wload=0.01,
+    ):
         """
 
         Args:
@@ -19,158 +32,198 @@ class ReservoirRandomFeatureConceptor:
             regressor: The model used to learn the mapping from the reservoir space to the outputs.
             aperture:
             inp_scale:
+            t_learn: Number of learning time steps.
+            t_learn_conceptor: Number of conceptor learning steps.
+            t_wash: Number of washout time steps.
         """
         self.F = F
         self.G_star = G_star
         self.W_bias = W_bias
 
         self.M, self.N = F.shape
+        """N: size of reservoir space
+           M: size of feature space
+        """
 
         self.aperture = aperture
         self.inp_scale = inp_scale
         self.regressor = regressor
-        self.C = []
-        self.t_learn = t_learn
+        self.W_in = W_in
+        self.conceptors = []
+        self.t_learn_regressor = t_learn
         self.t_learn_conceptor = t_learn_conceptor
         self.t_wash = t_wash
         self.c_adapt_rate = c_adapt_rate
         self.n_patterns = None
-        self.n_input_dimensions = None
         self.c_colls = None
         self.alpha_wload = alpha_wload
+        self.history = {}
 
     @classmethod
-    def init_random(cls, N=100, M=500, NetSR=1.4, bias_scale=0.2, aperture=8, inp_scale=1.2):
-        F, G_star, W_bias = ReservoirRandomFeatureConceptor._generate_connection_matrices(N, M, NetSR, bias_scale)
-        return cls(F, G_star, W_bias, Ridge(alpha=1), aperture, inp_scale)
+    def init_random(
+        cls, N=100, M=500, NetSR=1.4, bias_scale=0.2, aperture=8, inp_scale=1.2
+    ):
+        F, G_star, W_bias = ReservoirRandomFeatureConceptor._generate_connection_matrices(
+            N, M, NetSR, bias_scale
+        )
+        W_in = inp_scale * np.random.randn(F.shape[1])
 
-    def fit(self, patterns):
-        """
+        return cls(
+            F,
+            G_star,
+            W_bias,
+            Ridge(alpha=1),
+            W_in=W_in,
+            aperture=aperture,
+            inp_scale=inp_scale,
+        )
+
+    def fit(self, patterns: List[Callable[[int], float]]):
+        """Load pattens into the reservoir.
 
         Args:
-            patterns:
-            self.t_learn: Number of learning time steps.
-            self.t_learn_conceptor: Number of conceptor learning steps.
-            self.t_wash: Number of washout time steps.
-            TyA_wload:
-            load:
-            self.c_adapt_rate:
-
-        Returns:
-
+            patterns: List of functions producing patterns.
         """
 
-        self.n_patterns = len(patterns)
-        self.n_input_dimensions = 1
-        self.W_in = self.inp_scale * np.random.randn(self.N, self.n_input_dimensions)
-        self.c_colls = np.zeros([self.n_patterns, self.M, self.t_learn_conceptor])
-        self.targets = np.zeros([self.n_input_dimensions,
-                                 self.n_patterns * self.t_learn])  # TODO transpose dimensions so we have n_samples x n_features
-        self.all_z_scaled_collected = np.zeros([self.M, self.n_patterns * self.t_learn])
+        self._init_conceptors(patterns)
 
-        self.all_preactivations = np.zeros(
-            [self.N, self.n_patterns * self.t_learn])  # Collects recurrent_input + external_input
-        self.features = np.zeros([self.N, self.n_patterns * self.t_learn])
+        self._init_history()
+
         for i, pattern in enumerate(patterns):
             self._learn_one_pattern(pattern, i)
 
         self._train_regressor()
         self._load_weight_matrix()
 
-    def _train_regressor(self):
-        """Output Training with linear regression."""
-        self.regressor.fit(self.features.T, self.targets.flatten())
-        self.NRMSE_readout = utils.NRMSE(self.regressor.predict(self.features.T)[None, :], self.targets)
-        txt = f'NRMSE for output training = {self.NRMSE_readout}'
-        print(txt)
+    def _init_conceptors(self, patterns):
+        self.n_patterns = len(patterns)
+        self.conceptors = np.ones([self.n_patterns, self.M])
 
-    def _load_weight_matrix(self):
-        """Adapt weights to be able to generate output while driving with random input."""
-        self.G = Ridge(self.alpha_wload).fit(self.all_z_scaled_collected.T, self.all_preactivations.T).coef_
-        self.NRMSE_load = utils.NRMSE(self.G @ self.all_z_scaled_collected, self.all_preactivations)
-        txt = f'Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}'
-        print(txt)
+    def _init_history(self):
+        """Initialize arrays to write the training history to.
 
-    def _learn_one_pattern(self, pattern, i):
+        u: input
+        preactivations: recurrent_input + external_input.
+        r: reservoir space
+        c: conceptors
+        z_scaled: Feature space after scaling by conceptor.
+        """
+        self.history["u"] = np.zeros([self.n_patterns, self.t_learn_regressor])
+        self.history["preactivations"] = np.zeros(
+            [self.n_patterns, self.t_learn_regressor, self.N]
+        )
+        self.history["r"] = np.zeros([self.n_patterns, self.t_learn_regressor, self.N])
+        self.history["c"] = np.zeros([self.n_patterns, self.t_learn_conceptor, self.M])
+        self.history["z_scaled"] = np.zeros(
+            [self.n_patterns, self.t_learn_regressor, self.M]
+        )
+
+    def _learn_one_pattern(self, pattern, pattern_idx):
         self.z_scaled = np.zeros([self.M])
-        self.r_collected = np.zeros([self.N, self.t_learn])
-        self.c_collected = np.zeros([self.M, self.t_learn_conceptor])
-        self.u_collected = np.zeros([self.n_input_dimensions, self.t_learn])
-        self.z_scaled_collected = np.zeros([self.M, self.t_learn])
-        self.preactivations_collected = np.zeros([self.N, self.t_learn])
-        self.c = np.ones([self.M])
-        for t in range(self.t_learn + self.t_learn_conceptor + self.t_wash):
-            self._learn_one_step(pattern, t)
+        for t in range(self.t_learn_regressor + self.t_learn_conceptor + self.t_wash):
+            self._learn_one_step(pattern(t), t, pattern_idx)
 
-        self.C.append(self.c)
-        collection_index = slice(i * self.t_learn, (i + 1) * self.t_learn)
-        self.features[:, collection_index] = self.r_collected
-        self.targets[:, collection_index] = self.u_collected
-        self.all_z_scaled_collected[:, collection_index] = self.z_scaled_collected
-        # needed to recompute G
-        self.all_preactivations[:, collection_index] = self.preactivations_collected
-        # plot adaptation of c?
-        self.c_colls[i, ...] = self.c_collected
-
-    def _learn_one_step(self, pattern, t):
-        u = pattern(t)
+    def _learn_one_step(self, u, t, pattern_idx):
         z_scaled_old = self.z_scaled
         recurrent_input = self.G_star @ self.z_scaled
-        external_input = self.W_in @ u
+        external_input = self.W_in * u
         # Compute reservoir space through non-linearity.
         r = np.tanh(recurrent_input + external_input + self.W_bias)
         # Project to feature space.
         z = self.F @ r
         # Scale by conception weights.
-        self.z_scaled = self.c * z
-        # This is probably all state harvesting.
-        in_conceptor_learning_phase = self.t_wash < t <= (self.t_wash + self.t_learn_conceptor)
+        self.z_scaled = self.conceptors[pattern_idx] * z
+        in_conceptor_learning_phase = (
+            self.t_wash < t <= (self.t_wash + self.t_learn_conceptor)
+        )
         in_regressor_learning_phase = (self.t_wash + self.t_learn_conceptor) < t
         if in_conceptor_learning_phase:
-            self.c += self.c_adapt_rate * (
-                    (self.z_scaled - self.c * self.z_scaled) * self.z_scaled - (self.aperture ** -2) * self.c)
-            self.c_collected[:, t - self.t_wash - 1] = self.c
-        elif in_regressor_learning_phase:
-            offset = t - self.t_wash - self.t_learn_conceptor
+            self._adapt_conceptor(pattern_idx)
+            self.history["c"][pattern_idx, t - self.t_wash - 1] = self.conceptors[
+                pattern_idx
+            ]
 
-            self.r_collected[:, offset] = r
-            self.z_scaled_collected[:, offset] = z_scaled_old
-            self.u_collected[:, offset] = u
-            self.preactivations_collected[:, offset] = recurrent_input + external_input
+        elif in_regressor_learning_phase:
+            self._write_history(external_input, pattern_idx, r, recurrent_input, t, u, z_scaled_old)
+
+    def _adapt_conceptor(self, pattern_idx):
+        self.conceptors[pattern_idx] += self.c_adapt_rate * (
+                (self.z_scaled - self.conceptors[pattern_idx] * self.z_scaled)
+                * self.z_scaled
+                - (self.aperture ** -2) * self.conceptors[pattern_idx]
+        )
+
+    def _write_history(self, external_input, pattern_idx, r, recurrent_input, t, u, z_scaled_old):
+        offset = t - self.t_wash - self.t_learn_conceptor
+        self.history["r"][pattern_idx, offset] = r
+        self.history["z_scaled"][pattern_idx, offset] = z_scaled_old
+        self.history["u"][pattern_idx, offset] = u
+        self.history["preactivations"][pattern_idx, offset] = (
+                recurrent_input + external_input
+        )
+
+    def _train_regressor(self):
+        """Output training with linear regression."""
+        features = self.history["r"].reshape(-1, self.history["r"].shape[-1])
+        targets = self.history["u"].reshape(-1)
+        self.regressor.fit(features, targets)
+        self.NRMSE_readout = utils.NRMSE(self.regressor.predict(features), targets)
+        print(f"NRMSE for output training = {self.NRMSE_readout}")
+
+    def _load_weight_matrix(self):
+        """Adapt weights to be able to generate output while driving with random input."""
+        features = self.history["z_scaled"].reshape(
+            -1, self.history["z_scaled"].shape[-1]
+        )
+        targets = self.history["preactivations"].reshape(
+            -1, self.history["preactivations"].shape[-1]
+        )
+        self.G = Ridge(self.alpha_wload).fit(features, targets).coef_
+        self.NRMSE_load = utils.NRMSE(self.G @ features.T, targets.T)
+        print(f"Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}")
 
     def recall(self, t_washout=200, t_recall=200):
+        """Reproduce all learned patterns.
 
+        Args:
+            t_washout: Number of washout timesteps.
+            t_recall: Number of timesteps to be recalled.
+
+        Returns:
+            The recalled patterns.
+        """
         Y_recalls = []
 
         for i in range(self.n_patterns):
-            Y_recalls.append(
-                self._recall_pattern(i, t_washout, t_recall)
-            )
+            Y_recalls.append(self._recall_pattern(i, t_washout, t_recall))
         return Y_recalls
 
     def _recall_pattern(self, pattern_index, t_washout, t_recall):
-        c = np.asarray(self.C[pattern_index])
+        conceptor = np.asarray(self.conceptors[pattern_index])
         z_scaled = 0.5 * np.random.randn(self.M)
         for t in range(t_washout):
-            z_scaled, _ = self._run_conceptor(c, z_scaled)
+            z_scaled, _ = self._run_conceptor(conceptor, z_scaled)
 
-        y_recall = np.zeros([t_recall, self.n_input_dimensions])
+        y_recall = np.zeros([t_recall])
         for t in range(t_recall):
-            z_scaled, r = self._run_conceptor(c, z_scaled)
+            z_scaled, r = self._run_conceptor(conceptor, z_scaled)
             y_recall[t] = self.regressor.predict(r[None, :])
         return y_recall
 
-    def _run_conceptor(self, c, z_scaled):
+    def _run_conceptor(self, conceptor, z_scaled):
         recurrent_input = self.G @ z_scaled
         r = np.tanh(recurrent_input + self.W_bias)
-        z_scaled = c * (self.F @ r)
+        z_scaled = conceptor * (self.F @ r)
         return z_scaled, r
 
     @staticmethod
     def _generate_connection_matrices(N, M, NetSR, bias_scale):
-        F_raw, G_star_raw, spectral_radius = ReservoirRandomFeatureConceptor._init_connection_weights(N, M)
-        F_raw, G_star_raw = ReservoirRandomFeatureConceptor._rescale_connection_weights(F_raw, G_star_raw,
-                                                                                        spectral_radius)
+        F_raw, G_star_raw, spectral_radius = ReservoirRandomFeatureConceptor._init_connection_weights(
+            N, M
+        )
+        F_raw, G_star_raw = ReservoirRandomFeatureConceptor._rescale_connection_weights(
+            F_raw, G_star_raw, spectral_radius
+        )
 
         F = math.sqrt(NetSR) * F_raw
         G_star = math.sqrt(NetSR) * G_star_raw
@@ -189,7 +242,7 @@ class ReservoirRandomFeatureConceptor:
                 spectral_radius, _ = np.abs(lin.eigs(GF, 1))
                 success = True
             except Exception as ex:  # TODO what exceptions can happen here.
-                print('Retrying to generate internal weights.')
+                print("Retrying to generate internal weights.")
                 print(ex)
 
         return F_raw, G_star_raw, spectral_radius

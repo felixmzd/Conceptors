@@ -29,9 +29,7 @@ np.random.seed(0)
 # 69 = rand8 70 = rand4  71 = rand5  72 = rand6 73 = rand7
 # 74 = rand8
 
-patterns = []
-for i in range(78):
-    patterns.append(1)
+patterns = list(range(78))
 
 patterns[0] = lambda t: np.sin(2 * np.pi * t / 10)
 patterns[1] = lambda t: np.sin(2 * np.pi * t / 10)
@@ -226,12 +224,3 @@ patterns[76] = lambda t: 1.0 * np.sin(2 * np.pi * t / 0.0721342522)
 rp = np.array([0.515225899591, 0.641977677728,
                0.619641652873, 0.9, -0.336278680907])
 patterns[77] = lambda t: (rp[np.mod(t, 5)])
-
-
-def pattern_interface(pattern):
-    def vector_pattern(t):
-        return np.array([pattern(t)])
-    return vector_pattern
-
-for i, pattern in enumerate(patterns):
-    patterns[i] = pattern_interface(pattern)

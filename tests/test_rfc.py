@@ -20,7 +20,7 @@ def test_rfc_result(shared_datadir):
 
     allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, Y_recalls)
 
-    results = [allDriverPL, allRecallPL, reservoir.C, reservoir.c_colls]
+    results = [allDriverPL, allRecallPL, reservoir.conceptors, reservoir.history["c"]]
 
     original_pickle = pickle.load(open(shared_datadir / 'FigureObject.fig_rfc_old.pickle', 'rb'))
     for arr_old, arr_new in zip(original_pickle, results):
