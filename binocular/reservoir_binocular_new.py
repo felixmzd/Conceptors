@@ -5,7 +5,9 @@ import scipy.sparse.linalg as lin
 from binocular import utils
 from .reservoir_rfc import ReservoirRandomFeatureConceptor
 from sklearn.linear_model import Ridge
-np.seterr(all='raise')
+
+# np.seterr(all='raise')
+
 
 class ReservoirBinocular(ReservoirRandomFeatureConceptor):
     def __init__(
@@ -57,53 +59,17 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         self._init_binocular_history(t_run)
 
         for t in range(t_run):
-            print(t)
-
             u = self._apply_topdown_feedback(t)
             u = 1.0 * u
             u = self._add_noise(u)
 
             for layer in range(self.depth):
                 self._run_layer(u, layer)
+            self._mix_by_trusts(layer)
 
             self._write_binocular_history(t)
 
-    def _run_layer(self, u, l):
-        predicted_signal = self.D @ self.z_scaled[l]
-        if l == 0:
-            self.y[l] = u
-        else:
-            trust = self.trusts[l - 1]
-            u = (1 - trust) + self.y[l - 1] + trust * predicted_signal
-
-        recurrent_input = self.G @ self.z_scaled[l]
-        external_input = self.W_in * u + self.W_bias
-        # Compute reservoir space through non-linearity.
-        r = np.tanh(recurrent_input + external_input)
-        # Project to feature space.
-        z = self.F @ r
-        # Scale by conception weights.
-        self.z_scaled[l] = self.mixed_conceptors[l] * z
-        self.y[l + 1] = self.W_out @ r
-        self.y_means[l] = (self.trust_smooth_rate * self.y_means[l]
-                           + (1 - self.trust_smooth_rate) * self.y[l])
-        self.y_variances[l] = (
-                self.trust_smooth_rate * self.y_variances[l]
-                + (1 - self.trust_smooth_rate)
-                * ((self.y[l] - self.y_means[l]) ** 2)
-        )
-        self.unexplained[l] = predicted_signal - self.y[l]
-        self.discrepancies[l] = (self.trust_smooth_rate * self.discrepancies[l]
-                                 + ((1 - self.trust_smooth_rate)
-                                    * (self.unexplained[l] ** 2)
-                                    / self.y_variances[l]))
-        # Todo this explodes for layer 1 in iteration 21.
-        self.auto_conceptors[l] += self.c_adapt_rate * (
-                (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
-                * self.z_scaled[l]
-                # - (1 / np.power(self.aperture, 2)) * self.auto_conceptors[l]
-                - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
-        )
+    def _mix_by_trusts(self, l):
         # Adapt trusts.
         if l > 0:
             self.trusts[l - 1] = (1 / (1 + (self.discrepancies[l] / self.discrepancies[l - 1])
@@ -126,13 +92,52 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                                         / (P_times_gamma
                                            + 1 / (self.aperture ** 2)))  # TODO ?
 
+    def _run_layer(self, u, l):
+        predicted_signal = self.D @ self.z_scaled[l]
+        if l == 0:
+            self.y[l] = u
+        else:
+            trust = self.trusts[l - 1]
+            u = (1 - trust) + self.y[l - 1] + trust * predicted_signal
+
+        recurrent_input = self.G @ self.z_scaled[l]
+        external_input = self.W_in * u + self.W_bias
+        # Compute reservoir space through non-linearity.
+        r = np.tanh(recurrent_input + external_input)
+        # Project to feature space.
+        z = self.F @ r
+        # Scale by conception weights.
+        self.z_scaled[l] = self.mixed_conceptors[l] * z
+        self.y[l + 1] = self.W_out @ r
+
+        self.y_means[l] = (self.trust_smooth_rate * self.y_means[l]
+                           + (1 - self.trust_smooth_rate) * self.y[l + 1])
+        self.y_variances[l] = (
+                self.trust_smooth_rate * self.y_variances[l]
+                + (1 - self.trust_smooth_rate)
+                * ((self.y[l+1] - self.y_means[l]) ** 2)
+        )
+        self.unexplained[l] = predicted_signal - self.y[l]
+        self.discrepancies[l] = (self.trust_smooth_rate * self.discrepancies[l]
+                                 + ((1 - self.trust_smooth_rate)
+                                    * (self.unexplained[l] ** 2)
+                                    / self.y_variances[l]))
+        # Todo this explodes for layer 1 in iteration 21.
+        self.auto_conceptors[l] += self.c_adapt_rate * (
+                (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
+                * self.z_scaled[l]
+                # - (1 / np.power(self.aperture, 2)) * self.auto_conceptors[l]
+                - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
+        )
+
+
     def _init_states(self):
         self.noise_level = np.std(self.history["u"]) / self.snr
         self.y = np.zeros(self.depth + 1)
         self.z_scaled = np.zeros([self.depth, self.M])
         self.unexplained = np.zeros(self.depth)
         self.hypotheses = np.ones([self.depth, self.n_patterns]) / self.n_patterns
-        P_times_gamma = self.P @ self.hypotheses.T
+        P_times_gamma = self.P @ (self.hypotheses ** 2).T
         self.auto_conceptors = (P_times_gamma / (P_times_gamma + 1 / self.aperture ** 2)).T
         self.mixed_conceptors = np.copy(self.auto_conceptors)
         self.y_means = np.zeros(self.depth)
@@ -170,7 +175,7 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
             -1, self.history["z_scaled"].shape[-1]
         )
         targets = self.history["u"].reshape(-1)
-        self.D = Ridge(self.alpha_wload).fit(features, targets).coef_
+        self.D = Ridge(self.alpha_wload, fit_intercept=False).fit(features, targets).coef_
         self.W_out = self.regressor.coef_
 
     def _apply_topdown_feedback(self, t):

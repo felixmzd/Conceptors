@@ -21,7 +21,7 @@ def main():
     plot_and_save_loading(reservoir, patterns, Y_recalls)
     # save_driver_input(reservoir)
     # save_real_input(reservoir)
-    # save_result(reservoir)
+    save_result(reservoir)
     # save_predictions(reservoir)
     make_plots(reservoir)
 
@@ -85,11 +85,11 @@ def plot_and_save_loading(reservoir, patterns, Y_recalls):
 
 def save_result(reservoir):
     res = [
-        reservoir.all["hypo3"],
-        reservoir.all["hypo2"],
-        reservoir.all["hypo1"],
-        reservoir.all["trusts12"],
-        reservoir.all["trusts23"],
+        reservoir.history["hypotheses"][2],
+        reservoir.history["hypotheses"][1],
+        reservoir.history["hypotheses"][0],
+        reservoir.history["trusts"][0],
+        reservoir.history["trusts"][1],
     ]
     with open("FigureObject.fig_result.pickle", "wb") as fp:
         pickle.dump(res, fp)
@@ -129,13 +129,24 @@ def make_plots(reservoir):
     plt.plot(reservoir.history["trusts"][plot_range, 1], "g", label="level2")
     # plt.plot(reservoir.all["trusts3"].T, "y", label="level3")
     plt.title("trusts")
+
     # plt.figure()
-    # plt.plot(reservoir.all["unexplained1"][:, 3960:4000].T, "b", label="level1")
-    # plt.plot(reservoir.all["unexplained2"][:, 3960:4000].T, "g", label="level2")
-    # plt.plot(reservoir.all["unexplained3"][:, 3960:4000].T, "y", label="level3")
+    # plt.plot(reservoir.history["unexplained1"][plot_range, 0], "b", label="level1")
+    # plt.plot(reservoir.history["unexplained2"][plot_range, 1].T, "g", label="level2")
+    # plt.plot(reservoir.history["unexplained3"][plot_range, 2 ].T, "y", label="level3")
     # # plot(reservoir.all['driver'][:, 0:500].T, 'g')
     # plt.title("unexplained")
     # plt.legend()
+
+    plt.figure()
+    plt.plot(reservoir.history["y"][plot_range, 0],  label="driver")
+    plt.plot(reservoir.history["y"][plot_range, 1], label="level1")
+    plt.plot(reservoir.history["y"][plot_range, 2 ], label="level2")
+    plt.plot(reservoir.history["y"][plot_range, 3 ], label="level3")
+
+    plt.title("all level output")
+    plt.legend()
+
     #
     # fig, ax = plt.subplots()
     # # ax.plot(reservoir.all["real_input"].T[1500:1600], label="real input")

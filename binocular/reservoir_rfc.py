@@ -81,7 +81,7 @@ class ReservoirRandomFeatureConceptor:
             F,
             G_star,
             W_bias,
-            Ridge(alpha=1),
+            Ridge(alpha=1, fit_intercept=False),
             W_in=W_in,
             aperture=aperture,
             inp_scale=inp_scale,
@@ -185,7 +185,7 @@ class ReservoirRandomFeatureConceptor:
         targets = self.history["recurrent_input"].reshape(
             -1, self.history["recurrent_input"].shape[-1]
         )
-        self.G = Ridge(self.alpha_wload).fit(features, targets).coef_
+        self.G = Ridge(0.1, fit_intercept=False).fit(features, targets).coef_
         self.NRMSE_load = utils.NRMSE(self.G @ features.T, targets.T)
         print(f"Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}")
 
