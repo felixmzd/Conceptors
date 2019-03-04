@@ -6,6 +6,7 @@ from binocular import utils
 from .reservoir_rfc import ReservoirRandomFeatureConceptor
 from sklearn.linear_model import Ridge
 
+
 # np.seterr(all='raise')
 
 
@@ -65,15 +66,17 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
 
             for layer in range(self.depth):
                 self._run_layer(u, layer)
-            self._mix_by_trusts(layer)
+            for layer in range(self.depth):
+                self._adapt_trust(layer)
+            for layer in range(self.depth):
+                self._mix_by_trusts(layer)
+            for layer in reversed(range(self.depth)):
+                self.mix_conceptors(layer)
 
             self._write_binocular_history(t)
+            print(self.trusts)
 
     def _mix_by_trusts(self, l):
-        # Adapt trusts.
-        if l > 0:
-            self.trusts[l - 1] = (1 / (1 + (self.discrepancies[l] / self.discrepancies[l - 1])
-                                       ** self.trust_adapt_steepness))
         # Calculate hypotheses.
         P_times_gamma = self.P @ (self.hypotheses[l] ** 2)
         hypo_adapt = (2  # TODO where is this 2 coming from?
@@ -83,14 +86,23 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                       + self.drift * (0.5 - self.hypotheses[l]))
         self.hypotheses[l] = self.hypotheses[l] + self.hypotheses_learning_rate * hypo_adapt
         self.hypotheses[l] = self.hypotheses[l] / self.hypotheses[l].sum()
-        # Remix autoconceptors.
+
+    def mix_conceptors(self, l):
+        P_times_gamma = self.P @ (self.hypotheses[l] ** 2)
+
         if l < self.depth - 1:
             self.mixed_conceptors[l] = ((1 - self.trusts[l]) + self.auto_conceptors[l]
-                                        + self.trusts[l] * self.auto_conceptors[l + 1])
+                                        + self.trusts[l] * self.mixed_conceptors[l + 1])
         else:
             self.mixed_conceptors[l] = (P_times_gamma
                                         / (P_times_gamma
                                            + 1 / (self.aperture ** 2)))  # TODO ?
+
+    def _adapt_trust(self, l):
+        # Adapt trusts.
+        if l > 0:
+            self.trusts[l - 1] = (1 / (1 + (self.discrepancies[l] / self.discrepancies[l - 1])
+                                       ** self.trust_adapt_steepness))
 
     def _run_layer(self, u, l):
         predicted_signal = self.D @ self.z_scaled[l]
@@ -115,7 +127,7 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         self.y_variances[l] = (
                 self.trust_smooth_rate * self.y_variances[l]
                 + (1 - self.trust_smooth_rate)
-                * ((self.y[l+1] - self.y_means[l]) ** 2)
+                * ((self.y[l + 1] - self.y_means[l]) ** 2)
         )
         self.unexplained[l] = predicted_signal - self.y[l]
         self.discrepancies[l] = (self.trust_smooth_rate * self.discrepancies[l]
@@ -123,13 +135,13 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                                     * (self.unexplained[l] ** 2)
                                     / self.y_variances[l]))
         # Todo this explodes for layer 1 in iteration 21.
-        self.auto_conceptors[l] += self.c_adapt_rate * (
-                (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
-                * self.z_scaled[l]
-                # - (1 / np.power(self.aperture, 2)) * self.auto_conceptors[l]
-                - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
-        )
-
+        if l < self.depth-1:
+            self.auto_conceptors[l] += self.c_adapt_rate * (
+                    (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
+                    * self.z_scaled[l]
+                    # - (1 / np.power(self.aperture, 2)) * self.auto_conceptors[l]
+                    - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
+            )
 
     def _init_states(self):
         self.noise_level = np.std(self.history["u"]) / self.snr
@@ -138,8 +150,8 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         self.unexplained = np.zeros(self.depth)
         self.hypotheses = np.ones([self.depth, self.n_patterns]) / self.n_patterns
         P_times_gamma = self.P @ (self.hypotheses ** 2).T
-        self.auto_conceptors = (P_times_gamma / (P_times_gamma + 1 / self.aperture ** 2)).T
-        self.mixed_conceptors = np.copy(self.auto_conceptors)
+        self.mixed_conceptors = (P_times_gamma / (P_times_gamma + 1 / self.aperture ** 2)).T
+        self.auto_conceptors = np.copy(self.mixed_conceptors[:-1])
         self.y_means = np.zeros(self.depth)
         self.y_variances = np.ones(self.depth)
 
