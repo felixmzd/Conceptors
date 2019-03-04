@@ -69,9 +69,9 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
             for layer in range(self.depth):
                 self._adapt_trust(layer)
             for layer in range(self.depth):
-                self._adapt_hypotheses(layer)
+                P_times_gamma = self._adapt_hypotheses(layer)
             for layer in reversed(range(self.depth)):
-                self._mix_conceptors(layer)
+                self._mix_conceptors(layer, P_times_gamma)
 
             self._write_binocular_history(t)
             # print(self.trusts)
@@ -85,13 +85,13 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                       + self.drift * (0.5 - self.hypotheses[l]))
         self.hypotheses[l] = self.hypotheses[l] + self.hypotheses_learning_rate * hypo_adapt
         self.hypotheses[l] = self.hypotheses[l] / self.hypotheses[l].sum()
+        return P_times_gamma
 
-    def _mix_conceptors(self, l):
+    def _mix_conceptors(self, l, P_times_gamma):
         if l < self.depth - 1:
             self.mixed_conceptors[l] = ((1 - self.trusts[l]) + self.auto_conceptors[l]
                                         + self.trusts[l] * self.mixed_conceptors[l + 1])
         else:
-            P_times_gamma = self.P @ (self.hypotheses[l] ** 2)
             self.mixed_conceptors[l] = (P_times_gamma
                                         / (P_times_gamma
                                            + 1 / (self.aperture ** 2)))  # TODO ?
@@ -132,12 +132,12 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                                     * (self.unexplained[l] ** 2)
                                     / self.y_variances[l]))
         # Todo this explodes for layer 1 in iteration 21.
-        if l < self.depth-1:
+        if l < self.depth - 1:
             self.auto_conceptors[l] += self.c_adapt_rate * (
                     (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
                     * self.z_scaled[l]
                     - (1 / np.power(self.aperture, 2)) * self.auto_conceptors[l]
-                    # - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
+                # - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
             )
 
     def _init_states(self):
