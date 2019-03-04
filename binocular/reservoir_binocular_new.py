@@ -86,25 +86,25 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                            + (1 - self.trust_smooth_rate) * self.y[l])
         self.y_variances[l] = (self.trust_smooth_rate * self.y_variances[l]
                                + (1 - self.trust_smooth_rate)
-                               * (self.y[l] - self.y_means[l]) ** 2)
+                               * np.power(self.y[l] - self.y_means[l], 2))
         self.unexplained[l] = predicted_signal - self.y[l]
         self.discrepancies[l] = (self.trust_smooth_rate * self.discrepancies[l]
                                  + ((1 - self.trust_smooth_rate)
-                                    * self.unexplained[l] ** 2
+                                    * np.power(self.unexplained[l], 2)
                                     / self.y_variances[l]))
         self.auto_conceptors[l] += self.c_adapt_rate * (
                 (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
                 * self.z_scaled[l]
-                - (self.aperture ** -2) * self.auto_conceptors[l]
+                - 1 / np.power(self.aperture, 2) * self.auto_conceptors[l]
         )
         # Adapt trusts.
         if l > 0:
-            self.trusts[l - 1] = (1 / (1 + (self.discrepancies[l] / self.discrepancies[l - 1])
-                                       ** self.trust_adapt_steepness))
+            self.trusts[l - 1] = (1 / (1 + np.power(self.discrepancies[l] / self.discrepancies[l - 1],
+                                                    self.trust_adapt_steepness)))
         # Calculate hypotheses.
-        P_times_gamma = self.P @ (self.hypotheses[l] ** 2)
+        P_times_gamma = self.P @ np.power(self.hypotheses[l], 2)
         hypo_adapt = (2  # TODO where is this 2 coming from?
-                      * (self.z_scaled[l] ** 2 - P_times_gamma)
+                      * (np.power(self.z_scaled[l], 2) - P_times_gamma)
                       @ self.P
                       @ np.diag(self.hypotheses[l])
                       + self.drift * (0.5 - self.hypotheses[l]))
@@ -117,7 +117,7 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         else:
             self.mixed_conceptors[l] = (P_times_gamma
                                         / (P_times_gamma
-                                           + 1 / self.aperture ** 2))  # TODO ?
+                                           + 1 / np.power(self.aperture, 2)))  # TODO ?
 
     def _init_states(self):
         self.noise_level = np.std(self.history["u"]) / self.snr
@@ -145,7 +145,7 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         # They are used to indirectly compose a weighted disjunction of the prototype conception weight vectors
         # together with the aperture the mean signal energies define a conception weight vector.
         # Feature space energy is a measure for how well the conceptor fits the activations.
-        signal_energy = self.history["z_scaled"] ** 2
+        signal_energy = np.power(self.history["z_scaled"], 2)
         # mean signal energy for every pattern.
         # [n_patterns, M]
         # where M is the mean of squared z_scaled.
