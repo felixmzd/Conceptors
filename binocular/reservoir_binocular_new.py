@@ -40,12 +40,6 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         )
 
         self.depth = depth
-        self.y_means = np.zeros(self.depth)
-        self.y_variances = np.ones(self.depth)
-
-        self.trusts = 0.5 * np.ones(depth - 1)
-        self.discrepancies = 0.5 * np.ones(self.depth)
-        self.hypotheses = None
         self.snr = 1.2
         self.trust_smooth_rate = 0.99
         self.trust_adapt_steepness = 8
@@ -78,21 +72,22 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         else:
             trust = self.trusts[l - 1]
             u = (1 - trust) + self.y[l - 1] + trust * predicted_signal
-        recurrent_input = self.G_star @ self.z_scaled[0]
+
+        recurrent_input = self.G_star @ self.z_scaled[l]
         external_input = self.W_in * u + self.W_bias
         # Compute reservoir space through non-linearity.
         r = np.tanh(recurrent_input + external_input)
         # Project to feature space.
         z = self.F @ r
         # Scale by conception weights.
-        self.z_scaled[l] = self.mixed_conceptors[0] * z
-        self.y[l + 1] = self.W_out @ self.r[l]
+        self.z_scaled[l] = self.mixed_conceptors[l] * z
+        self.y[l + 1] = self.W_out @ r
         self.y_means[l] = (self.trust_smooth_rate * self.y_means[l]
                            + (1 - self.trust_smooth_rate) * self.y[l])
         self.y_variances[l] = (self.trust_smooth_rate * self.y_variances[l]
-                               + (1 - self.trust_smooth_rate) * (
-                                       self.y[l] - self.y_means[l]) ** 2)
-        self.unexplained[l] = predicted_signal - self.y[0]
+                               + (1 - self.trust_smooth_rate)
+                               * (self.y[l] - self.y_means[l]) ** 2)
+        self.unexplained[l] = predicted_signal - self.y[l]
         self.discrepancies[l] = (self.trust_smooth_rate * self.discrepancies[l]
                                  + ((1 - self.trust_smooth_rate)
                                     * self.unexplained[l] ** 2
@@ -107,8 +102,9 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
             self.trusts[l - 1] = (1 / (1 + (self.discrepancies[l] / self.discrepancies[l - 1])
                                        ** self.trust_adapt_steepness))
         # Calculate hypotheses.
-        P_times_gamma = self.P @ (self.hypotheses[l] ** 2).T
-        hypo_adapt = (((self.z_scaled[l] ** 2 - P_times_gamma)).T
+        P_times_gamma = self.P @ (self.hypotheses[l] ** 2)
+        hypo_adapt = (2  # TODO where is this 2 coming from?
+                      * (self.z_scaled[l] ** 2 - P_times_gamma)
                       @ self.P
                       @ np.diag(self.hypotheses[l])
                       + self.drift * (0.5 - self.hypotheses[l]))
@@ -125,14 +121,17 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
 
     def _init_states(self):
         self.noise_level = np.std(self.history["u"]) / self.snr
-        self.r = np.zeros([self.depth, self.N])
         self.y = np.zeros(self.depth + 1)
         self.z_scaled = np.zeros([self.depth, self.M])
         self.auto_conceptors = np.ones([self.depth, self.M])
         self.mixed_conceptors = np.ones([self.depth, self.M])
         self.unexplained = np.zeros(self.depth)
-        self.hypotheses = np.ones([self.depth, self.n_patterns])
-        self.hypotheses = self.hypotheses / self.hypotheses.mean(axis=0)
+        self.hypotheses = np.ones([self.depth, self.n_patterns]) / self.n_patterns
+        self.y_means = np.zeros(self.depth)
+        self.y_variances = np.ones(self.depth)
+
+        self.trusts = 0.5 * np.ones(self.depth - 1)
+        self.discrepancies = 0.5 * np.ones(self.depth)
 
     def _write_binocular_history(self, t):
         self.history["y"][t] = self.y
@@ -148,12 +147,15 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         # Feature space energy is a measure for how well the conceptor fits the activations.
         signal_energy = self.history["z_scaled"] ** 2
         # mean signal energy for every pattern.
-        self.raw_Z = np.mean(signal_energy, axis=1)
-        norms_Z = np.sqrt(np.sum(self.raw_Z ** 2, axis=-1))
-        mean_norms_Z = np.mean(norms_Z)
-        print("Mean feature space energies for every pattern = {0}".format(norms_Z))
+        # [n_patterns, M]
+        # where M is the mean of squared z_scaled.
+        P_star = np.mean(signal_energy, axis=1)
+        norms_P = np.linalg.norm(P_star, axis=-1)
+        mean_norms_P = np.mean(norms_P)
+        print("Mean feature space energies for every pattern = {0}".format(norms_P))
         # prototype mean signal energy vector matrix
-        self.P = (self.raw_Z.T @ np.diag(1.0 / norms_Z)) * mean_norms_Z
+        # [M, n_patterns]
+        self.P: "[M, n_patterns]" = ((P_star.T @ np.diag(1.0 / norms_P)) * mean_norms_P)
 
     def _init_mappings(self):
         features = self.history["z_scaled"].reshape(
@@ -177,6 +179,8 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
         return u + noise
 
     def _init_binocular_history(self, t_run):
+        # These history objects follow the indexing scheme:
+        # timestep, layer[, pattern].
         self.history["y"] = np.zeros([t_run, self.depth + 1])
         self.history["trusts"] = np.zeros([t_run, self.depth - 1])
         self.history["hypotheses"] = np.zeros([t_run, self.depth, self.n_patterns])

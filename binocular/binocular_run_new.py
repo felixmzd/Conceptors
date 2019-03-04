@@ -18,7 +18,7 @@ def main():
 
     reservoir, Y_recalls = run_reservoir(patterns, t_run=5000)
 
-    # plot_and_save_loading(reservoir, patterns, Y_recalls)
+    plot_and_save_loading(reservoir, patterns, Y_recalls)
     # save_driver_input(reservoir)
     # save_real_input(reservoir)
     # save_result(reservoir)
@@ -54,7 +54,7 @@ def plot_and_save_loading(reservoir, patterns, Y_recalls):
             "NRMSE: {0}".format(round(NRMSE[i], 4)),
             bbox=dict(facecolor="white", alpha=1),
         )
-        plt.plot(allDriverPL[i, :], color="gray", linewidth=4.0, label="Driver")
+        plt.plot(allDriverPL[i, :], color="gray", linewidth=6.0, label="Driver")
         plt.plot(allRecallPL[i, :], color="black", label="Recall")
         plt.legend()
         plt.title("Original driver and recalled signal for Sine {0}".format(i + 1))
@@ -105,8 +105,10 @@ def save_predictions(reservoir):
 
 def make_plots(reservoir):
     # recall
+    plot_range = slice(3960, 4000)
+    plot_range = slice(0, 50)
     plt.figure()
-    plt.plot(reservoir.history["y"][3960:4000, 3], color="black", label="output")
+    plt.plot(reservoir.history["y"][plot_range, 3], color="black", label="output")
     # plt.plot(
     #     reservoir.all["y3"][:, 3960:4000].T - reservoir.all["driver"][:, 3960:4000].T,
     #     color="gray",
@@ -114,13 +116,13 @@ def make_plots(reservoir):
     #     label="difference",
     # )
     plt.plot(
-        reservoir.history["y"][3960:4000, 0],
+        reservoir.history["y"][plot_range, 0],
         color="blue",
         linewidth=4.0,
         label="driver",
     )
-    # plt.title("output and difference ")
-    # plt.legend()
+    plt.title("output and difference ")
+    plt.legend()
     # discrepancys on every level
     plt.figure()
     plt.plot(reservoir.history["trusts"][0], "b", label="level1")

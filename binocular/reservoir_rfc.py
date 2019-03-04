@@ -120,6 +120,8 @@ class ReservoirRandomFeatureConceptor:
         c: conceptors
         z_scaled: Feature space after scaling by conceptor.
         """
+        # These history objects follow the indexing scheme:
+        # pattern, timestep[, vector_size].
         self.history["u"] = np.zeros([self.n_patterns, self.t_learn_regressor])
         self.history["preactivations"] = np.zeros(
             [self.n_patterns, self.t_learn_regressor, self.N]
