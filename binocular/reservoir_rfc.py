@@ -9,19 +9,19 @@ from . import utils
 
 class ReservoirRandomFeatureConceptor:
     def __init__(
-        self,
-        F,
-        G_star,
-        W_bias,
-        regressor,
-        W_in,
-        aperture=10,
-        inp_scale=1.2,
-        t_learn=400,
-        t_learn_conceptor=2000,
-        t_wash=200,
-        c_adapt_rate=0.5,
-        alpha_wload=0.01,
+            self,
+            F,
+            G_star,
+            W_bias,
+            regressor,
+            W_in,
+            aperture=10,
+            inp_scale=1.2,
+            t_learn=400,
+            t_learn_conceptor=2000,
+            t_wash=200,
+            c_adapt_rate=0.5,
+            alpha_wload=0.01,
     ):
         """
 
@@ -61,16 +61,16 @@ class ReservoirRandomFeatureConceptor:
 
     @classmethod
     def init_random(
-        cls,
-        N=100,
-        M=500,
-        NetSR=1.4,
-        bias_scale=0.2,
-        aperture=8,
-        inp_scale=1.2,
-        t_learn=400,
-        t_learn_conceptor=2000,
-        t_wash=200,
+            cls,
+            N=100,
+            M=500,
+            NetSR=1.4,
+            bias_scale=0.2,
+            aperture=8,
+            inp_scale=1.2,
+            t_learn=400,
+            t_learn_conceptor=2000,
+            t_wash=200,
     ):
         F, G_star, W_bias = ReservoirRandomFeatureConceptor._generate_connection_matrices(
             N, M, NetSR, bias_scale
@@ -100,12 +100,30 @@ class ReservoirRandomFeatureConceptor:
         self._init_conceptors(patterns)
 
         self._init_history()
+        self._drive_with_random_input(patterns)
+        self._regularize_G()
 
         for i, pattern in enumerate(patterns):
             self._learn_one_pattern(pattern, i)
 
         self._train_regressor()
-        self._load_weight_matrix()
+
+    # def fit(self, patterns: List[Callable[[int], float]]):
+    #     """Load pattens into the reservoir.
+    #
+    #     Args:
+    #         patterns: List of functions producing patterns.
+    #     """
+    #
+    #     self._init_conceptors(patterns)
+    #
+    #     self._init_history()
+    #     self.G = self.G_star
+    #     for i, pattern in enumerate(patterns):
+    #         self._learn_one_pattern(pattern, i)
+    #
+    #     self._train_regressor()
+    #     self._regularize_G()
 
     def _init_conceptors(self, patterns):
         self.n_patterns = len(patterns)
@@ -132,6 +150,57 @@ class ReservoirRandomFeatureConceptor:
             [self.n_patterns, self.t_learn_regressor, self.M]
         )
 
+        self.history["z"] = np.zeros(
+            [self.n_patterns, self.t_learn_regressor, self.M]
+        )
+        self.history["recurrent_input"] = np.zeros(
+            [self.n_patterns, self.t_learn_regressor, self.N]
+        )
+
+    def _drive_with_random_input(self, patterns):
+        for pattern_idx, _ in enumerate(patterns):
+            z = np.zeros([self.M])
+            for t in range(self.t_learn_regressor + self.t_learn_conceptor + self.t_wash):
+                u = 2 * np.random.random() - 1  # TODO why not Gaussian?
+                z_old = z
+                recurrent_input = self.G_star @ z
+                external_input = self.W_in * u
+                # Compute reservoir space through non-linearity.
+                r = np.tanh(recurrent_input + external_input + self.W_bias)
+                # Project to feature space.
+                z = self.F @ r
+                # Scale by conception weights.
+                in_regressor_learning_phase = (self.t_wash + self.t_learn_conceptor) < t
+                if in_regressor_learning_phase:
+                    offset = t - self.t_wash - self.t_learn_conceptor
+
+                    self.history["z"][pattern_idx, offset] = z_old
+                    self.history["recurrent_input"][pattern_idx, offset] = recurrent_input
+
+    def _regularize_G(self):
+        """Adapt weights to be able to generate output while driving with random input."""
+        features = self.history["z"].reshape(
+            -1, self.history["z"].shape[-1]
+        )
+        targets = self.history["recurrent_input"].reshape(
+            -1, self.history["recurrent_input"].shape[-1]
+        )
+        self.G = Ridge(self.alpha_wload).fit(features, targets).coef_
+        self.NRMSE_load = utils.NRMSE(self.G @ features.T, targets.T)
+        print(f"Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}")
+
+    # def _regularize_G(self):
+    #     """Adapt weights to be able to generate output while driving with random input."""
+    #     features = self.history["z_scaled"].reshape(
+    #         -1, self.history["z_scaled"].shape[-1]
+    #     )
+    #     targets = self.history["preactivations"].reshape(
+    #         -1, self.history["preactivations"].shape[-1]
+    #     )
+    #     self.G = Ridge(self.alpha_wload).fit(features, targets).coef_
+    #     self.NRMSE_load = utils.NRMSE(self.G @ features.T, targets.T)
+    #     print(f"Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}")
+
     def _learn_one_pattern(self, pattern, pattern_idx):
         self.z_scaled = np.zeros([self.M])
         for t in range(self.t_learn_regressor + self.t_learn_conceptor + self.t_wash):
@@ -139,7 +208,7 @@ class ReservoirRandomFeatureConceptor:
 
     def _learn_one_step(self, u, t, pattern_idx):
         z_scaled_old = self.z_scaled
-        recurrent_input = self.G_star @ self.z_scaled
+        recurrent_input = self.G @ self.z_scaled
         external_input = self.W_in * u
         # Compute reservoir space through non-linearity.
         r = np.tanh(recurrent_input + external_input + self.W_bias)
@@ -148,7 +217,7 @@ class ReservoirRandomFeatureConceptor:
         # Scale by conception weights.
         self.z_scaled = self.conceptors[pattern_idx] * z
         in_conceptor_learning_phase = (
-            self.t_wash < t <= (self.t_wash + self.t_learn_conceptor)
+                self.t_wash < t <= (self.t_wash + self.t_learn_conceptor)
         )
         in_regressor_learning_phase = (self.t_wash + self.t_learn_conceptor) < t
         if in_conceptor_learning_phase:
@@ -172,27 +241,27 @@ class ReservoirRandomFeatureConceptor:
 
     def _adapt_conceptor(self, pattern_idx):
         self.conceptors[pattern_idx] += self.c_adapt_rate * (
-            (self.z_scaled - self.conceptors[pattern_idx] * self.z_scaled)
-            * self.z_scaled
-            - (self.aperture ** -2) * self.conceptors[pattern_idx]
+                (self.z_scaled - self.conceptors[pattern_idx] * self.z_scaled)
+                * self.z_scaled
+                - (self.aperture ** -2) * self.conceptors[pattern_idx]
         )
 
     def _write_history(
-        self,
-        offset,
-        external_input,
-        pattern_idx,
-        r,
-        recurrent_input,
-        t,
-        u,
-        z_scaled_old,
+            self,
+            offset,
+            external_input,
+            pattern_idx,
+            r,
+            recurrent_input,
+            t,
+            u,
+            z_scaled_old,
     ):
         self.history["r"][pattern_idx, offset] = r
         self.history["z_scaled"][pattern_idx, offset] = z_scaled_old
         self.history["u"][pattern_idx, offset] = u
         self.history["preactivations"][pattern_idx, offset] = (
-            recurrent_input + external_input
+                recurrent_input + external_input
         )
 
     def _train_regressor(self):
@@ -202,18 +271,6 @@ class ReservoirRandomFeatureConceptor:
         self.regressor.fit(features, targets)
         self.NRMSE_readout = utils.NRMSE(self.regressor.predict(features), targets)
         print(f"NRMSE for output training = {self.NRMSE_readout}")
-
-    def _load_weight_matrix(self):
-        """Adapt weights to be able to generate output while driving with random input."""
-        features = self.history["z_scaled"].reshape(
-            -1, self.history["z_scaled"].shape[-1]
-        )
-        targets = self.history["preactivations"].reshape(
-            -1, self.history["preactivations"].shape[-1]
-        )
-        self.G = Ridge(self.alpha_wload).fit(features, targets).coef_
-        self.NRMSE_load = utils.NRMSE(self.G @ features.T, targets.T)
-        print(f"Mean NRMSE per neuron for recomputing G = {np.mean(self.NRMSE_load)}")
 
     def recall(self, t_washout=200, t_recall=200):
         """Reproduce all learned patterns.

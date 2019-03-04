@@ -125,8 +125,8 @@ def make_plots(reservoir):
     plt.legend()
     # discrepancys on every level
     plt.figure()
-    plt.plot(reservoir.history["trusts"][0], "b", label="level1")
-    plt.plot(reservoir.history["trusts"][1], "g", label="level2")
+    plt.plot(reservoir.history["trusts"][plot_range, 0], "b", label="level1")
+    plt.plot(reservoir.history["trusts"][plot_range, 1], "g", label="level2")
     # plt.plot(reservoir.all["trusts3"].T, "y", label="level3")
     plt.title("trusts")
     # plt.figure()

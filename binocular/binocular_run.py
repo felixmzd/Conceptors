@@ -32,8 +32,8 @@ def main():
 
 
 def run_reservoir(patterns, t_run):
-    # reservoir = ReservoirBinocular.init_random(N=100, M=700, NetSR=1.4, bias_scale=0.2, alpha=10, inp_scale=1.2)
-    reservoir = binocular.reservoir_binocular.ReservoirBinocular.init_random(N=100,M=700,NetSR=1.4,bias_scale=0.2,aperture=10,inp_scale=1.2,t_learn=600,t_learn_conceptor=2000,)
+    reservoir = ReservoirBinocular.init_random(N=100, M=700, NetSR=1.4, bias_scale=0.2, alpha=10, inp_scale=1.2)
+    # reservoir = binocular.reservoir_binocular.ReservoirBinocular.init_random(N=100,M=700,NetSR=1.4,bias_scale=0.2,aperture=10,inp_scale=1.2,t_learn=600,t_learn_conceptor=2000,)
     reservoir.fit(patterns)
     Y_recalls = reservoir.recall()
     reservoir.binocular(t_run=t_run)
@@ -105,17 +105,19 @@ def save_predictions(reservoir):
 
 
 def make_plots(reservoir):
+    plot_range = slice(0, 50)
+
     # recall
     plt.figure()
-    plt.plot(reservoir.all["y3"][:, 3960:4000].T, color="black", label="output")
+    plt.plot(reservoir.all["y3"][:, plot_range].T, color="black", label="output")
     plt.plot(
-        reservoir.all["y3"][:, 3960:4000].T - reservoir.all["driver"][:, 3960:4000].T,
+        reservoir.all["y3"][:, plot_range].T - reservoir.all["driver"][:, plot_range].T,
         color="gray",
         linewidth=4.0,
         label="difference",
     )
     plt.plot(
-        reservoir.all["driver"][:, 3960:4000].T,
+        reservoir.all["driver"][:, plot_range].T,
         color="blue",
         linewidth=4.0,
         label="driver",
@@ -129,19 +131,20 @@ def make_plots(reservoir):
     plt.plot(reservoir.all["trusts3"].T, "y", label="level3")
     plt.title("trusts")
     plt.figure()
-    plt.plot(reservoir.all["unexplained1"][:, 3960:4000].T, "b", label="level1")
-    plt.plot(reservoir.all["unexplained2"][:, 3960:4000].T, "g", label="level2")
-    plt.plot(reservoir.all["unexplained3"][:, 3960:4000].T, "y", label="level3")
+    plt.plot(reservoir.all["unexplained1"][:, plot_range].T, "b", label="level1")
+    plt.plot(reservoir.all["unexplained2"][:, plot_range].T, "g", label="level2")
+    plt.plot(reservoir.all["unexplained3"][:, plot_range].T, "y", label="level3")
     # plot(reservoir.all['driver'][:, 0:500].T, 'g')
     plt.title("unexplained")
     plt.legend()
 
     fig, ax = plt.subplots()
     # ax.plot(reservoir.all["real_input"].T[1500:1600], label="real input")
+    # plot_range = slice(1500, 1600)
     ax.plot(
-        reservoir.all["real_input_w-o_noise"].T[1500:1600], label="input without noise"
+        reservoir.all["real_input_w-o_noise"].T[plot_range], label="input without noise"
     )
-    ax.plot(reservoir.all["y3"].T[1500:1600], label="prediction")
+    ax.plot(reservoir.all["y3"].T[plot_range], label="prediction")
     fig.legend()
     ax.set(title="inputs")
 
