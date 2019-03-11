@@ -330,9 +330,7 @@ class ReservoirHierarchicalRandomFeatureConceptor:
         for i, p in zip(range(self.n_patts), self.patterns):
             offset = i * t_run
             print(i + 1)
-            ### Dictionary of Variables ###
-            # inext
-            # inaut
+
 
             for t in range(t_run):
                 u = p(t)

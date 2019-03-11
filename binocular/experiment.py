@@ -1,40 +1,67 @@
-"""Run this script to create pickle files for plotting."""
-from binocular.reservoir_binocular_old import *
-import binocular.reservoir_binocular
-from binocular import pattern_functions
-import matplotlib.pyplot as plt
-import scipy.stats as stats
 import pickle
-from matplotlib.pyplot import *
+import numpy as np
+import matplotlib.pyplot as plt
+from sacred import Experiment
+from binocular import pattern_functions
+from binocular.reservoir_binocular import ReservoirBinocular
+from binocular import utils
 
-np.random.seed(1)
+ex = Experiment("binocular")
 
 
-def main():
-    # pattern_idxs = [50, 27]
-    # pattern_idxs = [50, 20]
+@ex.config
+def config():
+    N = 100
+    M = 700
+    NetSR = 1.4
+    bias_scale = 0.2
+    aperture = 10
+    inp_scale = 1.2
+    t_run = 5000
+    t_learn = 600
+    t_learn_conceptor = 2000
+    t_washout = 200
+    TyA_wout = 1
+    TyA_wload = 0.01
+    c_adapt_rate = 0.5
     pattern_idxs = [50, 53]
-    patterns = [pattern_functions.patterns[p] for p in pattern_idxs]
-
-    reservoir, Y_recalls = run_reservoir(patterns, t_run=5000)
-
-    plot_and_save_loading(reservoir, patterns, Y_recalls)
-    save_driver_input(reservoir)
-    save_real_input(reservoir)
-    save_result(reservoir)
-    save_predictions(reservoir)
-    make_plots(reservoir)
-
-    dominance_times = compute_dominance_times(reservoir)
-    save_dominance_times(dominance_times)
-
-    plt.show()
+    seed = 1
 
 
-def run_reservoir(patterns, t_run):
-    reservoir = ReservoirBinocular.init_random(N=100, M=700, NetSR=1.4, bias_scale=0.2, alpha=10, inp_scale=1.2)
-    # reservoir = binocular.reservoir_binocular.ReservoirBinocular.init_random(N=100,M=700,NetSR=1.4,bias_scale=0.2,aperture=10,inp_scale=1.2,t_learn=600,t_learn_conceptor=2000,)
-    reservoir.fit(patterns)
+@ex.capture
+def run_reservoir(
+    patterns,
+    N,
+    M,
+    NetSR,
+    bias_scale,
+    aperture,
+    inp_scale,
+    t_run,
+    t_learn,
+    t_learn_conceptor,
+    t_washout,
+    TyA_wout,
+    TyA_wload,
+    c_adapt_rate,
+):
+    reservoir = ReservoirBinocular.init_random(
+        N=N,
+        M=M,
+        NetSR=NetSR,
+        bias_scale=bias_scale,
+        alpha=aperture,
+        inp_scale=inp_scale,
+    )
+    reservoir.fit(
+        patterns,
+        t_learn=t_learn,
+        t_learnc=t_learn_conceptor,
+        t_wash=t_washout,
+        TyA_wout=TyA_wout,
+        TyA_wload=TyA_wload,
+        c_adapt_rate=c_adapt_rate,
+    )
     Y_recalls = reservoir.recall()
     reservoir.binocular(t_run=t_run)
     return reservoir, Y_recalls
@@ -161,14 +188,6 @@ def compute_dominance_times(reservoir):
     dominance_times_signal_1 = dominance_times[::2]
     dominance_times_signal_2 = dominance_times[1::2]
 
-    # # delete all that are shorter than a specified value (maybe 25 timesteps),
-    # # they are not perceivalbe and unsignitifcant
-    # cutval = 0
-    # del_idx_1 = np.nonzero(dom_sg1 <= cutval)[0]
-    # del_idx_2 = np.nonzero(dom_sg2 <= cutval)[0]
-    # dom_sg1 = np.delete(dom_sg1, del_idx_1)
-    # dom_sg2 = np.delete(dom_sg2, del_idx_2)
-
     # Normalize.
     dominance_times_signal_1 = (
         dominance_times_signal_1 / dominance_times_signal_1.mean()
@@ -176,7 +195,7 @@ def compute_dominance_times(reservoir):
     dominance_times_signal_2 = (
         dominance_times_signal_2 / dominance_times_signal_2.mean()
     )
-    return [dominance_times_signal_1, dominance_times_signal_2]
+    return dominance_times_signal_1, dominance_times_signal_2
 
 
 def save_dominance_times(domtimes):
@@ -184,5 +203,20 @@ def save_dominance_times(domtimes):
         pickle.dump(domtimes, fp, protocol=2)
 
 
-if __name__ == "__main__":
-    main()
+@ex.automain
+def run(pattern_idxs):
+    patterns = [pattern_functions.patterns[p] for p in pattern_idxs]
+
+    reservoir, Y_recalls = run_reservoir(patterns)
+
+    plot_and_save_loading(reservoir, patterns, Y_recalls)
+    save_driver_input(reservoir)
+    save_real_input(reservoir)
+    save_result(reservoir)
+    save_predictions(reservoir)
+    make_plots(reservoir)
+
+    dominance_times = compute_dominance_times(reservoir)
+    save_dominance_times(dominance_times)
+
+    plt.show()

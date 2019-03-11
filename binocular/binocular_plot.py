@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 09 17:08:43 2015
-
-@author: User
-"""
-
 from binocular.reservoir_binocular import ReservoirBinocular
 from binocular.pattern_functions import patterns
 from binocular import utils
@@ -13,64 +6,58 @@ from matplotlib.pyplot import *
 import scipy.stats as stats
 import pickle
 
-t0 = time.clock()
+t0 = time.perf_counter()
 
-
-#for p in [53, 54, 10, 36]:
+# for p in [53, 54, 10, 36]:
 # quite good :
-#for p in [50,  20]:
-#for p in [50,  27]:
-patterns = [patterns[p] for p in [50,  27]]
+# for p in [50,  20]:
+# for p in [50,  27]:
+patterns = [patterns[p] for p in [50, 27]]
 
-A = ReservoirBinocular()
-A.run(patterns)
+A = ReservoirBinocular.init_random()
+A.fit(patterns)
 A.recall()
 A.binocular(t_run=50000)
 
-
-txt = 'Time used for computations {0}'.format(time.clock()-t0)
+txt = 'Time used for computations {0}'.format(time.perf_counter() - t0)
 print(txt)
 
 ### PLOTTING ###
 
 ###
-allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, A.Y_recalls, plotrange = 100)
+allDriverPL, allRecallPL, NRMSE = utils.plot_interpolate_1d(patterns, A.Y_recalls, plotrange=100)
 loading = []
 loading.append(allDriverPL)
 loading.append(allRecallPL)
 loading.append(NRMSE)
 
 for i in range(len(patterns)):
-    subplot(len(patterns), 1, (i+1))
+    subplot(len(patterns), 1, (i + 1))
     # driver and recall
-    ylim([-1.1,1.1])
-    text(2, -1, 'NRMSE: {0}'.format(round(NRMSE[i],4)), bbox=dict(facecolor='white', alpha=1))
-    plot(allDriverPL[i,:], color='gray', linewidth=4.0, label = 'Driver')
-    plot(allRecallPL[i,:], color='black', label='Recall')
+    ylim([-1.1, 1.1])
+    text(2, -1, 'NRMSE: {0}'.format(round(NRMSE[i], 4)), bbox=dict(facecolor='white', alpha=1))
+    plot(allDriverPL[i, :], color='gray', linewidth=4.0, label='Driver')
+    plot(allRecallPL[i, :], color='black', label='Recall')
     legend()
-    title('Original driver and recalled signal for Sine {0}'.format(i+1))
+    title('Original driver and recalled signal for Sine {0}'.format(i + 1))
 
 with open('FigureObject.fig_loading.pickle', "wb") as fp:
     pickle.dump(loading, fp, protocol=2)
 
-
-
 # save driver input
 savedriver = []
-savedriver.append(A.all['driver_sine1'][:,0:100].T)
-savedriver.append(A.all['driver_sine2'][:,0:100].T)
-savedriver.append(A.all['driver_noise'][:,0:100].T)
-savedriver.append(A.all['driver'][:,0:100].T)
+savedriver.append(A.all['driver_sine1'][:, 0:100].T)
+savedriver.append(A.all['driver_sine2'][:, 0:100].T)
+savedriver.append(A.all['driver_noise'][:, 0:100].T)
+savedriver.append(A.all['driver'][:, 0:100].T)
 with open('FigureObject.fig_rawinput.pickle', "wb") as fp:
-   pickle.dump(savedriver, fp, protocol=2)
+    pickle.dump(savedriver, fp, protocol=2)
 
 save_real_input = []
-save_real_input.append(A.all['real_input_w-o_noise'][:,0:100].T)
-save_real_input.append(A.all['real_input'][:,0:100].T)
+save_real_input.append(A.all['real_input_w-o_noise'][:, 0:100].T)
+save_real_input.append(A.all['real_input'][:, 0:100].T)
 with open('FigureObject.fig_realinput.pickle', "wb") as fp:
-   pickle.dump(save_real_input, fp, protocol=2)
-
-
+    pickle.dump(save_real_input, fp, protocol=2)
 
 res = []
 
@@ -82,12 +69,10 @@ res.append(A.all['trusts23'])
 with open('FigureObject.fig_result.pickle', "wb") as fp:
     pickle.dump(res, fp, protocol=2)
 
-
 ###
 
 with open('FigureObject.fig_predictions.pickle', "wb") as fp:
     pickle.dump(A.all['y3'], fp, protocol=2)
-
 
 # # recall
 # plot(A.all['y3'][:,3960:4000].T, color='black')
@@ -111,13 +96,13 @@ with open('FigureObject.fig_predictions.pickle', "wb") as fp:
 # compute dominance times per signal / eye
 hypo = A.all['hypo3']
 
-maxidx = np.argmax(hypo,axis = 0)
+maxidx = np.argmax(hypo, axis=0)
 
 crossings = maxidx[0:-1] - maxidx[1:]
 cross_idx = np.nonzero(crossings)
 dom_times = cross_idx[0][1:] - cross_idx[0][0:-1]
 
-#dom_times = dom_times / np.mean(dom_times)
+# dom_times = dom_times / np.mean(dom_times)
 
 
 # as the signals are alternating, even indices belong to
@@ -133,11 +118,11 @@ del_idx_2 = np.nonzero(dom_sg2 <= cutval)[0]
 dom_sg1 = np.delete(dom_sg1, del_idx_1)
 dom_sg2 = np.delete(dom_sg2, del_idx_2)
 
-#dom_times = np.sort(dom_times)
+# dom_times = np.sort(dom_times)
 ## dismiss rapid changes as thex might not be conscious
-#dom_times = dom_times[40:]
+# dom_times = dom_times[40:]
 
-#dom_times = dom_times / np.mean(dom_times)
+# dom_times = dom_times / np.mean(dom_times)
 
 
 # normalize
@@ -147,6 +132,5 @@ domtimes.append(dom_sg1)
 domtimes.append(dom_sg2)
 with open('FigureObject.fig_domtimes.pickle', "wb") as fp:
     pickle.dump(domtimes, fp, protocol=2)
-
 
 show()
