@@ -78,7 +78,7 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
 
     def _adapt_hypotheses(self, l):
         P_times_gamma = self.P @ (self.hypotheses[l] ** 2)
-        hypo_adapt = (2  # TODO where is this 2 coming from?
+        hypo_adapt = (2  # TODO where is this 2 coming from? Apparently from the original matlab code.
                       * (self.z_scaled[l] ** 2 - P_times_gamma)
                       @ self.P
                       @ np.diag(self.hypotheses[l])
@@ -137,7 +137,6 @@ class ReservoirBinocular(ReservoirRandomFeatureConceptor):
                     (self.z_scaled[l] - self.auto_conceptors[l] * self.z_scaled[l])
                     * self.z_scaled[l]
                     - (1 / np.power(self.aperture, 2)) * self.auto_conceptors[l]
-                # - (1 / (self.aperture ** 2)) * self.auto_conceptors[l]
             )
 
     def _init_states(self):
