@@ -3,3 +3,4 @@ scipy
 matplotlib
 sklearn
 git+https://github.com/IDSIA/sacred.git
+pymongo
