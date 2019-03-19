@@ -226,7 +226,7 @@ def plot_hypothesis(reservoir):
     ax[3].plot(reservoir.all["trusts12"][0][:steps_to_plot].T, "k--", label="Trust 12")
     ax[3].plot(reservoir.all["trusts23"][0][:steps_to_plot].T, "k-", label="Trust 23")
     ax[3].legend(**legend_kwargs)
-    ax[2].set_title("Trusts")
+    ax[3].set_title("Trusts")
 
     savefig(fig, "hypotheses.pdf")
 
@@ -272,7 +272,9 @@ def make_plots(reservoir):
     plt.plot(reservoir.all["trusts1"].T, "b", label="level1")
     plt.plot(reservoir.all["trusts2"].T, "g", label="level2")
     plt.plot(reservoir.all["trusts3"].T, "y", label="level3")
-    plt.title("trusts")
+    plt.title("discrepancies")
+    plt.legend()
+
     plt.figure()
     plt.plot(reservoir.all["unexplained1"][:, plot_range].T, "b", label="level1")
     plt.plot(reservoir.all["unexplained2"][:, plot_range].T, "g", label="level2")
