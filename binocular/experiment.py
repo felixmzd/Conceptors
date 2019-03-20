@@ -279,13 +279,11 @@ def make_plots(reservoir):
     plt.plot(reservoir.all["unexplained1"][:, plot_range].T, "b", label="level1")
     plt.plot(reservoir.all["unexplained2"][:, plot_range].T, "g", label="level2")
     plt.plot(reservoir.all["unexplained3"][:, plot_range].T, "y", label="level3")
-    # plot(reservoir.all['driver'][:, 0:500].T, 'g')
     plt.title("unexplained")
     plt.legend()
 
     fig, ax = plt.subplots()
     ax.plot(reservoir.all["real_input"].T[plot_range], label="real input")
-    # plot_range = slice(1500, 1600)
     ax.plot(
         reservoir.all["real_input_w-o_noise"].T[plot_range], label="input without noise"
     )
@@ -319,49 +317,58 @@ def compute_dominance_times(reservoir):
 def plot_dominance_times(reservoir):
     bins = 15
     dom_sg1, dom_sg2 = compute_dominance_times(reservoir)
+    ylabel = "Density"
+
+    linewidth = 2
+    alpha = 0.8
     fig, ax = plt.subplots(2)
 
     n, bins, patches = ax[0].hist(
         dom_sg1,
         bins=bins,
         density=True,
-        facecolor="gray",
+        facecolor="#D0D1D3",
         edgecolor="black",
-        alpha=0.75,
+        alpha=1,
     )
 
     # fit gamma distribution
     params = stats.gamma.fit(dom_sg1, floc=0)
-    print(params)
+    print("gamma params signal 1", params)
 
     x = np.linspace(0, dom_sg1.max(), 100)
     fit_pdf = stats.gamma.pdf(x, *params)
-    ax[0].plot(x, fit_pdf, "k-", lw=5, alpha=0.6)
+    ax[0].plot(x, fit_pdf, "k-", lw=linewidth, alpha=alpha)
     ax[0].set(
-        xlabel="Dominance duration in simulated timesteps",
-        title="Distribution of dominance times for Sine 1",
+        xlabel=r"Normalized dominance duration for sine wave 1 ($t_1 / \overline{t_1}$)",
+        ylabel=ylabel,
     )
-
+    ax[0].spines['right'].set_visible(False)
+    ax[0].spines['top'].set_visible(False)
+    ax[0].tick_params(direction="in")
     ax[1].hist(
         dom_sg2,
         bins=bins,
         density=True,
-        facecolor="gray",
+        facecolor="#D0D1D3",
         edgecolor="black",
-        alpha=0.75,
+        alpha=1,
     )
 
     # fit gamma distribution
     params = stats.gamma.fit(dom_sg2, floc=0)
-    print(params)
+    print("gamma params signal 2", params)
 
     x = np.linspace(0, dom_sg2.max(), 100)
     fit_pdf = stats.gamma.pdf(x, *params)
-    ax[1].plot(x, fit_pdf, "k-", lw=5, alpha=0.6)
+    ax[1].plot(x, fit_pdf, "k-", lw=linewidth, alpha=alpha)
     ax[1].set(
-        xlabel="Dominance duration in simulated timesteps",
-        title="Distribution of dominance times for Sine 2",
+        xlabel=r"Normalized dominance duration for sine wave 2 ($t_2 / \overline{t_2}$)",
+        ylabel=ylabel,
     )
+    ax[1].spines['right'].set_visible(False)
+    ax[1].spines['top'].set_visible(False)
+    ax[1].tick_params(direction="in")
 
     savefig(fig, "domtimes.pdf")
 
