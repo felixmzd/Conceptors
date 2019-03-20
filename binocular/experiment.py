@@ -23,9 +23,9 @@ def config():
     M = 700
     NetSR = 1.4
     bias_scale = 0.2
-    aperture = 10
-    inp_scale = 1.2
-    t_run = 5000
+    aperture = 15
+    inp_scale = 1.0
+    t_run = 50000
     t_learn = 600
     t_learn_conceptor = 2000
     t_washout = 200
@@ -34,7 +34,7 @@ def config():
     TyA_G = 0.1
     c_adapt_rate = 0.5
     pattern_idxs = [50, 53]
-    SNR = 1.2
+    SNR = 1.0
     trust_smooth_rate = 0.99
     trust_adapt_steepness12 = 8
     trust_adapt_steepness23 = 8
