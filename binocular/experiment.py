@@ -14,7 +14,6 @@ from pathlib import Path
 ex = Experiment("binocular")
 ex.observers.append(FileStorageObserver.create(basedir="runs"))
 
-artifact_dir = Path(tempfile.mkdtemp())
 
 
 @ex.config
@@ -42,6 +41,7 @@ def config():
     hypo_adapt_rate = 0.002
 
     seed = 1
+    artifact_dir = Path(tempfile.mkdtemp())
 
 
 @ex.capture
@@ -97,7 +97,7 @@ def run_reservoir(
 
 
 @ex.capture
-def savefig(fig, filename, _run):
+def savefig(fig, filename, artifact_dir, _run):
     fig.tight_layout()
     filepath = artifact_dir / filename
     fig.savefig(filepath, bbox_inches="tight")
@@ -374,7 +374,7 @@ def plot_dominance_times(reservoir):
 
 
 @ex.automain
-def run(pattern_idxs):
+def run(pattern_idxs, artifact_dir):
     patterns = [pattern_functions.patterns[p] for p in pattern_idxs]
 
     reservoir, y_recalls = run_reservoir(patterns)
@@ -387,5 +387,4 @@ def run(pattern_idxs):
 
     plot_dominance_times(reservoir)
 
-    plt.show()
     shutil.rmtree(artifact_dir)

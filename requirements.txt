@@ -1,6 +1,4 @@
-numpy
-scipy
-matplotlib
-sklearn
+numpy==1.15.4
+scipy==1.1.0
+matplotlib==3.0.2
 git+https://github.com/IDSIA/sacred.git
-pymongo
