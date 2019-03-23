@@ -1,5 +1,5 @@
 # Bistable Perception in Conceptor Networks
-This paper contains code for the paper "Bistable Perception in Conceptor Networks".
+This repository contains code for the paper "Bistable Perception in Conceptor Networks".
 
 ## Reproduction of results
 To reproduce the results from the paper, do the following
