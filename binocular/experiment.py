@@ -15,7 +15,6 @@ ex = Experiment("binocular")
 ex.observers.append(FileStorageObserver.create(basedir="runs"))
 
 
-
 @ex.config
 def config():
     N = 100
@@ -24,7 +23,7 @@ def config():
     bias_scale = 0.2
     aperture = 15
     inp_scale = 1.0
-    t_run = 50000
+    t_run = 5000
     t_learn = 600
     t_learn_conceptor = 2000
     t_washout = 200
@@ -46,26 +45,26 @@ def config():
 
 @ex.capture
 def run_reservoir(
-        patterns,
-        N,
-        M,
-        NetSR,
-        bias_scale,
-        aperture,
-        inp_scale,
-        t_run,
-        t_learn,
-        t_learn_conceptor,
-        t_washout,
-        TyA_wout,
-        TyA_wload,
-        c_adapt_rate,
-        SNR,
-        trust_smooth_rate,
-        trust_adapt_steepness12,
-        trust_adapt_steepness23,
-        drift,
-        hypo_adapt_rate,
+    patterns,
+    N,
+    M,
+    NetSR,
+    bias_scale,
+    aperture,
+    inp_scale,
+    t_run,
+    t_learn,
+    t_learn_conceptor,
+    t_washout,
+    TyA_wout,
+    TyA_wload,
+    c_adapt_rate,
+    SNR,
+    trust_smooth_rate,
+    trust_adapt_steepness12,
+    trust_adapt_steepness23,
+    drift,
+    hypo_adapt_rate,
 ):
     reservoir = ReservoirBinocular.init_random(
         N=N,
@@ -85,11 +84,7 @@ def run_reservoir(
         hypo_adapt_rate=hypo_adapt_rate,
     )
     reservoir.fit(
-        patterns,
-        t_learn=t_learn,
-        t_learnc=t_learn_conceptor,
-        t_wash=t_washout,
-
+        patterns, t_learn=t_learn, t_learnc=t_learn_conceptor, t_wash=t_washout
     )
     Y_recalls = reservoir.recall()
     reservoir.binocular(t_run=t_run)
@@ -124,51 +119,55 @@ def plot_loading(patterns, Y_recalls):
         )
         ax[i].plot(allDriverPL[i, :], color="gray", linewidth=4.0, label="Driver")
         ax[i].plot(allRecallPL[i, :], color="black", label="Recall")
-    fig.legend(*ax[-1].get_legend_handles_labels(), loc="center right", bbox_to_anchor=(1.15, 0.5))
+    fig.legend(
+        *ax[-1].get_legend_handles_labels(),
+        loc="center right",
+        bbox_to_anchor=(1.15, 0.5),
+    )
     savefig(fig, "loading.pdf")
 
 
-# def save_driver_input(reservoir):
-#     driver_input = [
-#         reservoir.all["driver_sine1"][:, 0:100].T,
-#         reservoir.all["driver_sine2"][:, 0:100].T,
-#         reservoir.all["driver_noise"][:, 0:100].T,
-#         reservoir.all["driver"][:, 0:100].T,
-#     ]
-#     with open("FigureObject.fig_rawinput.pickle", "wb") as fp:
-#         pickle.dump(driver_input, fp, protocol=2)
-
-
 def plot_real_input(reservoir):
-    fig, ax = plt.subplots()
-    ax.set(ylim=[-4.5, 4.5], ylabel="t", yticks=np.arange(-4, 5, 2.0))
+    plot_range = slice(100, 200)
+
+    fig, ax = plt.subplots(figsize=(6, 2))
     ax.plot(
-        reservoir.all["real_input_w-o_noise"][:, :100].T,
-        color="gray",
-        linewidth=4.0,
-        label="input without noise",
+        reservoir.all["real_input_w-o_noise"][:, plot_range].T,
+        color="dimgray",
+        linewidth=2,
+        label="clean signal",
     )
     ax.plot(
-        reservoir.all["real_input"][:, :100].T, color="black", label="input + noise"
+        reservoir.all["real_input"][:, plot_range].T,
+        color="black",
+        linewidth=1,
+        label="signal + noise",
     )
-    fig.legend()
+    ax.set(
+        xlabel="simulated timesteps",
+        ylabel="signal",
+        ylim=[-3.5, 3.5],
+        xticks=np.arange(0, 101, 10),
+        yticks=np.arange(-4, 5, 2.0),
+    )
+    ax.tick_params(direction="in")
+    fig.legend(
+        bbox_to_anchor=(0.985, 1.05),
+        loc="upper right",
+        frameon=False,
+        ncol=2,
+    )
     savefig(fig, "real_input.pdf")
 
 
 def plot_hypothesis(reservoir):
-    # res = [
-    #     reservoir.all["hypo3"],
-    #     reservoir.all["hypo2"],
-    #     reservoir.all["hypo1"],
-    #     reservoir.all["trusts12"],
-    #     reservoir.all["trusts23"],
-    # ]
-
-    # TODO think about testing later.
-    # with open("../tests/data/FigureObject.fig_result.pickle", "wb") as fp:
-    #     pickle.dump(res, fp)
-    legend_kwargs = dict(bbox_to_anchor=(1.25, .5), borderaxespad=0.0, edgecolor="white", loc="center right",
-                         framealpha=0)
+    legend_kwargs = dict(
+        bbox_to_anchor=(1.25, 0.5),
+        borderaxespad=0.0,
+        edgecolor="white",
+        loc="center right",
+        framealpha=0,
+    )
     label_signal_1 = "Sine 1"
     label_signal_2 = "Sine 2"
     steps_to_plot = 3000
@@ -306,10 +305,10 @@ def compute_dominance_times(reservoir):
 
     # Normalize.
     dominance_times_signal_1 = (
-            dominance_times_signal_1 / dominance_times_signal_1.mean()
+        dominance_times_signal_1 / dominance_times_signal_1.mean()
     )
     dominance_times_signal_2 = (
-            dominance_times_signal_2 / dominance_times_signal_2.mean()
+        dominance_times_signal_2 / dominance_times_signal_2.mean()
     )
     return dominance_times_signal_1, dominance_times_signal_2
 
@@ -343,8 +342,8 @@ def plot_dominance_times(reservoir):
         xlabel=r"Normalized dominance duration for sine wave 1 ($t_1 / \overline{t_1}$)",
         ylabel=ylabel,
     )
-    ax[0].spines['right'].set_visible(False)
-    ax[0].spines['top'].set_visible(False)
+    ax[0].spines["right"].set_visible(False)
+    ax[0].spines["top"].set_visible(False)
     ax[0].tick_params(direction="in")
     ax[1].hist(
         dom_sg2,
@@ -366,8 +365,8 @@ def plot_dominance_times(reservoir):
         xlabel=r"Normalized dominance duration for sine wave 2 ($t_2 / \overline{t_2}$)",
         ylabel=ylabel,
     )
-    ax[1].spines['right'].set_visible(False)
-    ax[1].spines['top'].set_visible(False)
+    ax[1].spines["right"].set_visible(False)
+    ax[1].spines["top"].set_visible(False)
     ax[1].tick_params(direction="in")
 
     savefig(fig, "domtimes.pdf")
