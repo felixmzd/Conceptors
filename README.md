@@ -1,7 +1,7 @@
 # Bistable Perception in Conceptor Networks
 This repository contains code for the paper "Bistable Perception in Conceptor Networks".
 
-## Reproduction of results
+## How to reproduce results
 To reproduce the results from the paper, do the following
 
 * install [conda](https://docs.conda.io/en/latest/miniconda.html)
