@@ -13,13 +13,13 @@ To reproduce the results from the paper, do the following
 * activate the environment using
 
 
-    $ conda acitvate bistable
+    $ conda activate bistable
 
 * run the experiments
 
     
     $ cd binocular
-    $ PYTHONPATH.. python run.py
+    $ PYTHONPATH=.. python run.py
     
 
 The results should show up in the directory `binocular/runs`. Some auxiliary plots will pop
