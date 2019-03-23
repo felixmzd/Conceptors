@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/felixmzd/Conceptors.svg?branch=master)](https://travis-ci.org/felixmzd/Conceptors)
-
 # Bistable Perception in Conceptor Networks
 This paper contains code for the paper "Bistable Perception in Conceptor Networks".
 
