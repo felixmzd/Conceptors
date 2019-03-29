@@ -171,61 +171,63 @@ def plot_hypothesis(reservoir):
     label_signal_1 = "Sine 1"
     label_signal_2 = "Sine 2"
     steps_to_plot = 3000
+    linespec_1 = "k:"
+    linespec_2 = "k-"
 
     fig, ax = plt.subplots(4, sharex=True)
     ax[0].set_ylim([-0.1, 1.1])
     ax[0].plot(
         reservoir.all["hypo3"][0][:steps_to_plot].T,
-        "k--",
+        linespec_1,
         linewidth=1.3,
         label=label_signal_1,
     )
     ax[0].plot(
         reservoir.all["hypo3"][1][:steps_to_plot].T,
-        "k-",
+        linespec_2,
         linewidth=1.3,
         label=label_signal_2,
     )
     ax[0].legend(**legend_kwargs)
-    ax[0].set_title("Level 3 Hypotheses")
+    ax[0].set(title="Level 3 Hypotheses")
 
     ax[1].set_ylim([-0.1, 1.1])
     ax[1].plot(
         reservoir.all["hypo2"][0][:steps_to_plot].T,
-        "k--",
+        linespec_1,
         linewidth=1.3,
         label=label_signal_1,
     )
     ax[1].plot(
         reservoir.all["hypo2"][1][:steps_to_plot].T,
-        "k-",
+        linespec_2,
         linewidth=1.3,
         label=label_signal_2,
     )
     ax[1].legend(**legend_kwargs)
-    ax[1].set_title("Level 2 Hypotheses")
+    ax[1].set(title="Level 2 Hypotheses")
 
     ax[2].set_ylim([-0.1, 1.1])
     ax[2].plot(
         reservoir.all["hypo1"][0][:steps_to_plot].T,
-        "k--",
+        linespec_1,
         linewidth=1.3,
         label=label_signal_1,
     )
     ax[2].plot(
         reservoir.all["hypo1"][1][:steps_to_plot].T,
-        "k-",
+        linespec_2,
         linewidth=1.3,
         label=label_signal_2,
     )
     ax[2].legend(**legend_kwargs)
-    ax[2].set_title("Level 1 Hypotheses")
+    ax[2].set(title="Level 1 Hypotheses")
 
     ax[3].set_ylim([-0.1, 1.1])
-    ax[3].plot(reservoir.all["trusts12"][0][:steps_to_plot].T, "k--", label="Trust 12")
-    ax[3].plot(reservoir.all["trusts23"][0][:steps_to_plot].T, "k-", label="Trust 23")
+    ax[3].plot(reservoir.all["trusts12"][0][:steps_to_plot].T, linespec_1, label="Trust 12")
+    ax[3].plot(reservoir.all["trusts23"][0][:steps_to_plot].T, linespec_2, label="Trust 23")
     ax[3].legend(**legend_kwargs)
-    ax[3].set_title("Trusts")
+    ax[3].set(title="Trusts", xlabel="simulated timsteps")
 
     savefig(fig, "hypotheses.pdf")
 
