@@ -55,10 +55,10 @@ def plot_interpolate_1d(patterns, Y_recalls, overSFac=20, plotrange=30):
 # TODO scikit learn
 
 def NRMSE(output, target):
-    combinedVar = 0.5 * (np.var(target, 1) + np.var(output, 1))
+    combinedVar = 0.5 * (np.var(target) + np.var(output))
     error = output - target
 
-    return np.sqrt(np.mean(error ** 2, axis=1) / combinedVar)
+    return np.sqrt(np.mean(error ** 2) / combinedVar)
 
 
 def RidgeWout(TrainArgs, TrainOuts, TychonovAlpha):

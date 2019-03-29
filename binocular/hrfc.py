@@ -33,20 +33,25 @@ print(np.shape(reservoir.Z))
 figure()
 subplot(4, 1, 1)
 ylim([-0.1, 1.1])
-plot(reservoir.all['hypo3'].T)
+plot(reservoir.all['hypo3'].T, label='hypo3')
+legend()
 
 subplot(4, 1, 2)
 ylim([-0.1, 1.1])
-plot(reservoir.all['hypo2'].T)
+plot(reservoir.all['hypo2'].T, label='hypo2')
+legend()
 
 subplot(4, 1, 3)
 ylim([-0.1, 1.1])
-plot(reservoir.all['hypo1'].T)
+plot(reservoir.all['hypo1'].T, label='hypo1')
+legend()
 
 subplot(4, 1, 4)
 ylim([-0.1, 1.1])
-plot(reservoir.all['trusts12'].T, 'b')
-plot(reservoir.all['trusts23'].T, 'g')
+plot(reservoir.all['trusts12'].T, 'b', label='trust12')
+plot(reservoir.all['trusts23'].T, 'g', label='trust23')
+legend()
+title('hypotheses and trusts')
 
 figure()
 for i in range(len(patterns)):
@@ -54,10 +59,11 @@ for i in range(len(patterns)):
     l_idx = 4000 * (i + 1) - 40
     r_idx = 4000 * (i + 1)
     # original pattern
-    plot(reservoir.all['driver'][:, l_idx:r_idx].T, color='gray', linewidth=4.0)
+    plot(reservoir.all['driver'][:, l_idx:r_idx].T, color='gray', linewidth=4.0, label='original pattern')
     # recall
-    plot(reservoir.all['y3'][:, l_idx:r_idx].T, color='black')
+    plot(reservoir.all['y3'][:, l_idx:r_idx].T, color='black', label='recall')
     # pattern plus noise
-    plot(reservoir.all['driver'][:, l_idx:r_idx].T + reservoir.all['noise'][:, l_idx:r_idx].T, 'r')
-
+    plot(reservoir.all['driver'][:, l_idx:r_idx].T + reservoir.all['noise'][:, l_idx:r_idx].T, 'r', label='driver + noise')
+    title('denoising')
+    legend()
 show()

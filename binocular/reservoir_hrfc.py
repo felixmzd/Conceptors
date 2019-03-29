@@ -193,7 +193,7 @@ class ReservoirHierarchicalRandomFeatureConceptor:
 
         # compute feature space energys for every pattern
         # they are used to indirectly compose a weighted disjunction of the prototype conception weight vectors
-        # together with the aperture the mean signal energies define a concepion weight vector
+        # together with the aperture the mean signal energies define a conception weight vector
         # normalize
         print(self.raw_Z)
         norms_Z = np.sqrt(np.sum(np.power(self.raw_Z, 2), axis=0))
@@ -330,9 +330,7 @@ class ReservoirHierarchicalRandomFeatureConceptor:
         for i, p in zip(range(self.n_patts), self.patterns):
             offset = i * t_run
             print(i + 1)
-            ### Dictionary of Variables ###
-            # inext
-            # inaut
+
 
             for t in range(t_run):
                 u = p(t)
@@ -345,7 +343,7 @@ class ReservoirHierarchicalRandomFeatureConceptor:
                 r1 = np.tanh(self.G @ cphi1 + self.W_in * inext + self.W_bias)
                 cphi1 = c1 * (self.F @ r1)
                 y1 = self.W_out @ r1
-
+                # Autoconceptors
                 y1mean = trust_smooth_rate * y1mean + (1 - trust_smooth_rate) * y1
                 y1var = trust_smooth_rate * y1var + (1 - trust_smooth_rate) * (y1 - y1mean) ** 2
                 discrepancy1 = trust_smooth_rate * discrepancy1 + (1 - trust_smooth_rate) * (inaut - inext) ** 2 / y1var
