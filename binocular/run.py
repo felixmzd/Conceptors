@@ -1,9 +1,10 @@
-"""Run a set of different setups, that exhibit the bistabil phenomenon."""
+"""Run a set of different setups, that exhibit the bistable phenomenon."""
 from binocular.experiment import ex
 
 
 def main():
-    ex.run(config_updates={"t_run": 50_000})  # Default experiments presented in detail in the paper.
+    # Default experiments presented in detail in the paper.
+    ex.run(config_updates={"t_run": 50_000})
     ex.run(
         config_updates={
             "pattern_idxs": [50, 77],  # Sine and random periodic pattern.

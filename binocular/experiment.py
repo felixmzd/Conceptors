@@ -1,6 +1,7 @@
 import shutil
 
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sacred import Experiment
 import scipy.stats as stats
@@ -11,8 +12,12 @@ from sacred.observers import FileStorageObserver
 import tempfile
 from pathlib import Path
 
+mpl.rc("savefig", dpi=500)
+PLOT_EXT = "png"
+
 ex = Experiment("binocular")
 ex.observers.append(FileStorageObserver.create(basedir="runs"))
+
 
 
 @ex.config
@@ -124,7 +129,7 @@ def plot_loading(patterns, Y_recalls):
         loc="center right",
         bbox_to_anchor=(1.15, 0.5),
     )
-    savefig(fig, "loading.pdf")
+    savefig(fig, f"loading.{PLOT_EXT}")
 
 
 def plot_real_input(reservoir):
@@ -157,7 +162,7 @@ def plot_real_input(reservoir):
         frameon=False,
         ncol=2,
     )
-    savefig(fig, "real_input.pdf")
+    savefig(fig, f"real_input.{PLOT_EXT}")
 
 
 def plot_hypothesis(reservoir):
@@ -229,7 +234,7 @@ def plot_hypothesis(reservoir):
     ax[3].legend(**legend_kwargs)
     ax[3].set(title="Trusts", xlabel="simulated timsteps")
 
-    savefig(fig, "hypotheses.pdf")
+    savefig(fig, f"hypotheses.{PLOT_EXT}")
 
 
 def plot_predictions(reservoir):
@@ -245,7 +250,7 @@ def plot_predictions(reservoir):
     ax[2].plot(np.arange(1050, 1250, 1), y3[:, 1050:1250].T, "k-", linewidth=1.3)
     ax[2].set(title="Transition from Sine 1 to Sine 2")
 
-    savefig(fig, "predictions.pdf")
+    savefig(fig, f"predictions.{PLOT_EXT}")
 
 
 def make_plots(reservoir):
@@ -371,7 +376,7 @@ def plot_dominance_times(reservoir):
     ax[1].spines["top"].set_visible(False)
     ax[1].tick_params(direction="in")
 
-    savefig(fig, "domtimes.pdf")
+    savefig(fig, f"domtimes.{PLOT_EXT}")
 
 
 @ex.automain
