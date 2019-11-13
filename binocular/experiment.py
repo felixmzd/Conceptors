@@ -11,13 +11,30 @@ from binocular import utils
 from sacred.observers import FileStorageObserver
 import tempfile
 from pathlib import Path
+from functools import partial
 
 mpl.rc("savefig", dpi=500)
 PLOT_EXT = "png"
 
 ex = Experiment("binocular")
-ex.observers.append(FileStorageObserver.create(basedir="runs"))
+ex.observers.append(FileStorageObserver(basedir="runs"))
 
+
+def mixing_coefficient_fn(mixture_coefficient, hypo3, patterns, t):
+    if hypo3[0][0] > hypo3[0][1]:
+        u = (1 - mixture_coefficient) * patterns[0](t) + mixture_coefficient * patterns[
+            1
+        ](t)
+    else:
+        u = mixture_coefficient * patterns[0](t) + (1 - mixture_coefficient) * patterns[
+            1
+        ](t)
+    return u
+
+
+mixing_fn07 = partial(mixing_coefficient_fn, 0.7)
+mixing_fn05 = partial(mixing_coefficient_fn, 0.5)
+mixing_fn10 = partial(mixing_coefficient_fn, 1.0)
 
 
 @ex.config
@@ -43,6 +60,7 @@ def config():
     trust_adapt_steepness23 = 8
     drift = 0.0001
     hypo_adapt_rate = 0.002
+    mixing_fn = mixing_fn10
 
     seed = 1
     artifact_dir = Path(tempfile.mkdtemp())
@@ -70,8 +88,10 @@ def run_reservoir(
     trust_adapt_steepness23,
     drift,
     hypo_adapt_rate,
+    mixing_fn,
 ):
     reservoir = ReservoirBinocular.init_random(
+        mixing_fn,
         N=N,
         M=M,
         NetSR=NetSR,
@@ -157,10 +177,7 @@ def plot_real_input(reservoir):
     )
     ax.tick_params(direction="in")
     fig.legend(
-        bbox_to_anchor=(0.985, 1.05),
-        loc="upper right",
-        frameon=False,
-        ncol=2,
+        bbox_to_anchor=(0.985, 1.05), loc="upper right", frameon=False, ncol=2,
     )
     savefig(fig, f"real_input.{PLOT_EXT}")
 
@@ -229,8 +246,12 @@ def plot_hypothesis(reservoir):
     ax[2].set(title="Level 1 Hypotheses")
 
     ax[3].set_ylim([-0.1, 1.1])
-    ax[3].plot(reservoir.all["trusts12"][0][:steps_to_plot].T, linespec_1, label="Trust 12")
-    ax[3].plot(reservoir.all["trusts23"][0][:steps_to_plot].T, linespec_2, label="Trust 23")
+    ax[3].plot(
+        reservoir.all["trusts12"][0][:steps_to_plot].T, linespec_1, label="Trust 12"
+    )
+    ax[3].plot(
+        reservoir.all["trusts23"][0][:steps_to_plot].T, linespec_2, label="Trust 23"
+    )
     ax[3].legend(**legend_kwargs)
     ax[3].set(title="Trusts", xlabel="simulated timsteps")
 

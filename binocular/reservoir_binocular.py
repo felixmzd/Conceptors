@@ -23,13 +23,13 @@ def _init_connection_weights(N, M):
             F_raw = np.random.randn(M, N)
             G_star_raw = np.random.randn(N, M)
             GF = G_star_raw @ F_raw
-            spectral_radius, eigenvecs = np.abs(lin.eigs(GF, 1))
+            spectral_radius, _ = np.abs(lin.eigs(GF, 1))
             success = True
         except Exception as ex:  # TODO what exceptions can happen here.
             print("Retrying to generate internal weights.")
             print(ex)
-
-    return F_raw, G_star_raw, spectral_radius
+        else:
+            return F_raw, G_star_raw, spectral_radius
 
 
 def _rescale_connection_weights(F_raw, G_star_raw, spectral_radius):
@@ -41,6 +41,7 @@ def _rescale_connection_weights(F_raw, G_star_raw, spectral_radius):
 class ReservoirBinocular:
     def __init__(
         self,
+        mixing_fn,
         F,
         G_star,
         W_bias,
@@ -57,7 +58,7 @@ class ReservoirBinocular:
         hypo_adapt_rate=0.002,
         drift=0.0001,
     ):
-
+        self.mixing_fn = mixing_fn
         self.F = F
         self.G_star = G_star
         self.W_bias = W_bias
@@ -80,6 +81,7 @@ class ReservoirBinocular:
     @classmethod
     def init_random(
         cls,
+        mixing_fn,
         N=100,
         M=700,
         NetSR=1.4,
@@ -100,6 +102,7 @@ class ReservoirBinocular:
 
         F, G_star, W_bias = _generate_connection_matrices(N, M, NetSR, bias_scale)
         return cls(
+            mixing_fn,
             F,
             G_star,
             W_bias,
@@ -437,10 +440,13 @@ class ReservoirBinocular:
             # Jäger did...
 
             # only the part of the stimulus is fed into the system that can not be explained by the current hypothesis
-            if hypo3[0][0] > hypo3[0][1]:
-                u = 1.0 * self.patterns[1](t)
-            else:
-                u = 1.0 * self.patterns[0](t)
+            # if hypo3[0][0] > hypo3[0][1]:
+            #     u = 1.0 * self.patterns[1](t)
+            # else:
+            #     u = 1.0 * self.patterns[0](t)
+
+
+            u = self.mixing_fn(hypo3, self.patterns, t)
 
             # u = self.patterns[0](t) #+ self.patterns[1](t)) #- inaut  # Does not work maybe because of phase shift.
             # u = self.patterns[1](t)
